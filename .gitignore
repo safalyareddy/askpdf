@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Environment and Secrets
+.env
+*.local.env
+.env.*
+!.env.example
+
+# Application Storage & ChromaDB
+data/*
+!data/.gitkeep
+!data/documind-handbook.pdf
+db/*
+!db/.gitkeep
+db_*
+chroma_db/
+models/
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+htmlcov/
+.vscode/
+.idea/
+.DS_Store
+*.log
