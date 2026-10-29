@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuMind AI — Document Admin Portal</title>
+    <meta name="description" content="Secure administrative management and indexing portal for DocuMind AI.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090d16;
+            --surface: #111827;
+            --surface-card: rgba(17, 24, 39, 0.75);
+            --surface-hover: #1f2937;
+            --primary: #38bdf8;
+            --primary-glow: rgba(56, 189, 248, 0.25);
+            --accent: #818cf8;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --border: #1f293d;
+            --border-hover: #374151;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --text-sub: #6b7280;
+            --radius-sm: 8px;
+            --radius-md: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: radial-gradient(circle at 50% 0%, #172554 0%, #090d16 65%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            border-bottom: 1px solid var(--border);
+            background: rgba(9, 13, 22, 0.85);
+            backdrop-filter: blur(16px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .brand-logo {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .brand-logo svg {
+            width: 22px;
+            height: 22px;
+            color: #090d16;
+        }
+
+        .brand-text h1 {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .back-link:hover {
+            color: var(--primary);
+        }
+
+        main {
+            flex: 1;
+            max-width: 960px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2.5rem 1.5rem 4rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .auth-bar {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .auth-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .auth-input-group {
+            display: flex;
+            gap: 0.5rem;
+            flex: 1;
+            max-width: 450px;
+        }
+
+        .auth-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.85rem;
+            color: var(--text-main);
+            font-size: 0.85rem;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .auth-input:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            border: none;
+            border-radius: var(--radius-sm);
+            padding: 0.55rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #090d16;
+        }
+
+        .btn-primary:hover {
+            background: #0ea5e9;
+            box-shadow: 0 0 14px var(--primary-glow);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger);
+            color: #ffffff;
+        }
+
+        /* Upload Zone */
+        .upload-card {
+            background: var(--surface-card);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-md);
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .upload-card:hover, .upload-card.drag-over {
+            border-color: var(--primary);
+            background: rgba(56, 189, 248, 0.04);
+        }
+
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 1rem;
+            color: var(--primary);
+        }
+
+        .upload-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+
+        .upload-hint {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1.25rem;
+        }
+
+        /* Documents List Table */
+        .docs-section {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+
+        .docs-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .docs-title {
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.88rem;
+        }
+
+        th {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.85rem 1.5rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .empty-state {
+            padding: 3rem 1.5rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        /* Toast */
+        .toast-box {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.85rem 1.35rem;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 200;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="nav-container">
+            <a href="/" class="brand-container">
+                <div class="brand-logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1>DocuMind AI</h1>
+                    <p style="font-size:0.75rem; color:var(--text-muted);">Admin Portal</p>
+                </div>
+            </a>
+            <a href="/" class="back-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                Back to Q&A
+            </a>
+        </div>
+    </header>
+
+    <main>
+        <!-- Admin Authentication Form -->
+        <section class="auth-bar">
+            <div class="auth-label">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                <span>Admin Authorization Key</span>
+            </div>
+            <div class="auth-input-group">
+                <input type="password" id="admin-key-input" class="auth-input" placeholder="Enter X-Admin-Key..." />
+                <button class="btn btn-primary" onclick="saveAdminKey()">Save Key</button>
+            </div>
+        </section>
+
+        <!-- Drag & Drop Upload Zone -->
+        <section class="upload-card" id="drop-zone" onclick="document.getElementById('file-input').click()">
+            <input type="file" id="file-input" accept=".pdf" style="display:none;" onchange="handleFileSelected(event)" />
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <div class="upload-title">Drop PDF document here or browse</div>
+            <div class="upload-hint">PDF signature checked • Max 20 MB • Digital text auto-indexed with ChromaDB</div>
+            <button type="button" class="btn btn-primary" style="margin: 0 auto;">Select PDF File</button>
+        </section>
+
+        <!-- Upload Status / Progress -->
+        <div id="upload-status" style="display:none; padding:1rem; border-radius:var(--radius-sm); background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); font-size:0.88rem;"></div>
+
+        <!-- Indexed Documents Table -->
+        <section class="docs-section">
+            <div class="docs-header">
+                <div class="docs-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    Indexed Documents
+                </div>
+                <button class="btn" style="background:var(--surface-hover); color:var(--text-main);" onclick="loadDocuments()">
+                    Refresh
+                </button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Document Name</th>
+                            <th>Size (KB)</th>
+                            <th style="text-align:right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="docs-tbody">
+                        <tr><td colspan="3" class="empty-state">Loading documents...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="toast-box"></div>
+
+    <script>
+        function getAdminKey() {
+            return sessionStorage.getItem('documind_admin_key') || localStorage.getItem('documind_admin_key') || '';
+        }
+
+        function saveAdminKey() {
+            const val = document.getElementById('admin-key-input').value.trim();
+            if (!val) {
+                showToast("Please enter a valid key.");
+                return;
+            }
+            sessionStorage.setItem('documind_admin_key', val);
+            showToast("Admin key saved to session.");
+            loadDocuments();
+        }
+
+        // Initialize key input if present
+        const savedKey = getAdminKey();
+        if (savedKey) {
+            document.getElementById('admin-key-input').value = savedKey;
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.style.borderColor = isError ? '#ef4444' : 'var(--primary)';
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3500);
+        }
+
+        async function loadDocuments() {
+            const tbody = document.getElementById('docs-tbody');
+            const key = getAdminKey();
+
+            try {
+                const res = await fetch('/admin/list-pdfs', {
+                    headers: { 'X-Admin-Key': key }
+                });
+
+                if (res.status === 403) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="empty-state" style="color:#f87171;">Authorization required. Please enter your valid Admin Key above.</td></tr>`;
+                    return;
+                }
+
+                if (!res.ok) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Failed to load documents.</td></tr>`;
+                    return;
+                }
+
+                const data = await res.json();
+                const list = data.pdfs || [];
+
+                if (list.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">No PDF documents indexed yet. Upload one above.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = list.map(item => `
+                    <tr>
+                        <td style="font-weight:600;">${escapeHtml(item.filename)}</td>
+                        <td style="color:var(--text-muted);">${item.size_kb} KB</td>
+                        <td style="text-align:right;">
+                            <button class="btn btn-danger" onclick="deleteDocument('${escapeJs(item.filename)}')">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Error connecting to server.</td></tr>`;
+            }
+        }
+
+        async function handleFileSelected(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const key = getAdminKey();
+            if (!key) {
+                showToast("Admin key required. Enter it above.", true);
+                return;
+            }
+
+            const statusBox = document.getElementById('upload-status');
+            statusBox.style.display = 'block';
+            statusBox.innerHTML = `Uploading and indexing <strong>${escapeHtml(file.name)}</strong>...`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('super_user_key', key);
+
+            try {
+                const res = await fetch('/admin/upload-pdf', {
+                    method: 'POST',
+                    headers: { 'X-Admin-Key': key },
+                    body: formData
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    statusBox.innerHTML = `<span style="color:#34d399;">✓ ${escapeHtml(data.message)}</span>`;
+                    showToast("Uploaded and indexed!");
+                    loadDocuments();
+                } else {
+                    statusBox.innerHTML = `<span style="color:#ef4444;">✗ ${escapeHtml(data.detail || "Upload rejected.")}</span>`;
+                    showToast(data.detail || "Upload failed", true);
+                }
+            } catch (err) {
+                statusBox.innerHTML = `<span style="color:#ef4444;">✗ Network connection error during upload.</span>`;
+            }
+        }
+
+        async function deleteDocument(filename) {
+            if (!confirm(`Are you sure you want to delete '${filename}'? This will remove its vector embeddings.`)) {
+                return;
+            }
+
+            const key = getAdminKey();
+            try {
+                const res = await fetch(`/admin/delete-pdf?filename=${encodeURIComponent(filename)}`, {
+                    method: 'DELETE',
+                    headers: { 'X-Admin-Key': key }
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || "Document deleted.");
+                    loadDocuments();
+                } else {
+                    showToast(data.detail || "Deletion failed.", true);
+                }
+            } catch (err) {
+                showToast("Network error deleting document.", true);
+            }
+        }
+
+        // Drag and drop event listeners
+        const dropZone = document.getElementById('drop-zone');
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+            });
+        });
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('file-input').files = files;
+                handleFileSelected({ target: { files: files } });
+            }
+        });
+
+        function escapeHtml(text) {
+            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function escapeJs(text) {
+            return String(text).replace(/'/g, "\\'");
+        }
+
+        // Load initially
+        loadDocuments();
+    </script>
+</body>
+</html>

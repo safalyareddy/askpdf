@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuMind AI — Document Intelligence & Grounded Q&A</title>
+    <meta name="description" content="Private, local document intelligence with exact page-level citations powered by FastAPI, ChromaDB, and Ollama.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090d16;
+            --surface: #111827;
+            --surface-card: rgba(17, 24, 39, 0.75);
+            --surface-hover: #1f2937;
+            --primary: #38bdf8;
+            --primary-glow: rgba(56, 189, 248, 0.25);
+            --accent: #818cf8;
+            --accent-glow: rgba(129, 140, 248, 0.2);
+            --border: #1f293d;
+            --border-hover: #374151;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --text-sub: #6b7280;
+            --citation-bg: #0d1527;
+            --citation-border: #1e2942;
+            --tag-bg: rgba(56, 189, 248, 0.12);
+            --tag-text: #7dd3fc;
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: radial-gradient(circle at 50% 0%, #172554 0%, #090d16 65%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Header Navbar */
+        header {
+            border-bottom: 1px solid var(--border);
+            background: rgba(9, 13, 22, 0.85);
+            backdrop-filter: blur(16px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .brand-logo {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .brand-logo svg {
+            width: 22px;
+            height: 22px;
+            color: #090d16;
+        }
+
+        .brand-text h1 {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.85rem;
+            border-radius: 9999px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            font-size: 0.78rem;
+            color: #34d399;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            background: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+        }
+
+        .admin-link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.55rem 1.1rem;
+            border-radius: var(--radius-sm);
+            background: var(--surface-hover);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .admin-link-btn:hover {
+            background: #273549;
+            border-color: var(--primary);
+            color: var(--primary);
+            box-shadow: 0 0 14px var(--primary-glow);
+        }
+
+        /* Main Container */
+        main {
+            flex: 1;
+            max-width: 960px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 6rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* Hero / Introduction */
+        .hero {
+            text-align: center;
+            padding: 1.5rem 0 1rem;
+        }
+
+        .hero-tag {
+            display: inline-block;
+            padding: 0.35rem 0.9rem;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .hero h2 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.2;
+            margin-bottom: 0.65rem;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 620px;
+            margin: 0 auto 1.5rem;
+        }
+
+        .example-chips {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.6rem;
+            margin-top: 0.5rem;
+        }
+
+        .chip {
+            background: rgba(31, 41, 55, 0.6);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .chip:hover {
+            background: var(--surface-hover);
+            color: var(--primary);
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        /* Results / Answer Container */
+        .results-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .result-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.75rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.85rem;
+        }
+
+        .result-query-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-main);
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.35rem 0.65rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn:hover {
+            color: var(--primary);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        .answer-body {
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #e5e7eb;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Citations Drawer */
+        .citations-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            border-top: 1px solid var(--border);
+            padding-top: 1.2rem;
+        }
+
+        .citations-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .citations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 0.85rem;
+        }
+
+        .citation-card {
+            background: var(--citation-bg);
+            border: 1px solid var(--citation-border);
+            border-radius: var(--radius-sm);
+            padding: 0.85rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .citation-card:hover {
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+
+        .citation-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .citation-doc-name {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .citation-page-badge {
+            background: rgba(129, 140, 248, 0.18);
+            color: #c7d2fe;
+            border: 1px solid rgba(129, 140, 248, 0.3);
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.2rem 0.55rem;
+            border-radius: 9999px;
+            white-space: nowrap;
+        }
+
+        .citation-snippet {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-style: italic;
+        }
+
+        /* Loading Skeleton */
+        .loading-card {
+            display: none;
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.75rem;
+            backdrop-filter: blur(12px);
+            flex-direction: column;
+            gap: 1rem;
+            animation: pulse-glow 1.8s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { border-color: var(--border); box-shadow: 0 0 0 transparent; }
+            50% { border-color: rgba(56, 189, 248, 0.4); box-shadow: 0 0 25px var(--primary-glow); }
+        }
+
+        .loading-text-line {
+            height: 14px;
+            background: linear-gradient(90deg, #1f293d 25%, #2d3b55 50%, #1f293d 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Fixed / Sticky Prompt Bar */
+        .prompt-dock {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(180deg, rgba(9, 13, 22, 0) 0%, rgba(9, 13, 22, 0.95) 30%);
+            padding: 1.5rem 1.5rem 1.25rem;
+            z-index: 90;
+        }
+
+        .dock-inner {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        .search-box-form {
+            display: flex;
+            align-items: center;
+            background: rgba(17, 24, 39, 0.85);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 0.4rem 0.5rem 0.4rem 1.25rem;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+            transition: all 0.2s ease;
+        }
+
+        .search-box-form:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 25px var(--primary-glow);
+        }
+
+        .search-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+            padding: 0.6rem 0;
+        }
+
+        .search-input::placeholder {
+            color: var(--text-sub);
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+            border: none;
+            border-radius: 9999px;
+            color: #090d16;
+            font-weight: 700;
+            font-size: 0.9rem;
+            padding: 0.65rem 1.35rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            transition: all 0.2s ease;
+        }
+
+        .submit-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 16px var(--primary-glow);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Toast Notifications */
+        .toast-box {
+            position: fixed;
+            bottom: 5rem;
+            right: 1.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.75rem 1.25rem;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            display: none;
+            z-index: 200;
+            animation: fadeIn 0.2s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="nav-container">
+            <a href="/" class="brand-container">
+                <div class="brand-logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1>DocuMind AI</h1>
+                    <p>Grounded Document Intelligence</p>
+                </div>
+            </a>
+            <div class="nav-actions">
+                <div class="status-badge" id="system-status">
+                    <span class="status-dot"></span>
+                    <span id="status-text">Ollama Active</span>
+                </div>
+                <a href="/admin" class="admin-link-btn" title="Open Document Administration Portal">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                    </svg>
+                    Document Admin
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main>
+        <section class="hero">
+            <span class="hero-tag">Grounded Retrieval Engine</span>
+            <h2>Inquire Over Private Documents with Strict Citations</h2>
+            <p>Every response is verified and attributed with exact document names and page indices. Zero hallucination guarantee.</p>
+
+            <div class="example-chips">
+                <button class="chip" onclick="applyPrompt('What are the core components of DocuMind AI?')">What are the core components of DocuMind AI?</button>
+                <button class="chip" onclick="applyPrompt('Explain the administrative access and security guardrails.')">Explain the security guardrails</button>
+                <button class="chip" onclick="applyPrompt('What is the grounding and verification policy?')">What is the grounding policy?</button>
+            </div>
+        </section>
+
+        <!-- Loading Indicator -->
+        <div class="loading-card" id="loading-skeleton">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.85rem; color:var(--primary); font-weight:700;">Searching vector passages & synthesizing answer...</span>
+            </div>
+            <div class="loading-text-line" style="width: 90%;"></div>
+            <div class="loading-text-line" style="width: 75%;"></div>
+            <div class="loading-text-line" style="width: 82%;"></div>
+            <div class="loading-text-line" style="width: 45%;"></div>
+        </div>
+
+        <!-- Answers Feed -->
+        <section class="results-container" id="results-feed">
+            <!-- Dynamic answers will be prepended here -->
+        </section>
+    </main>
+
+    <!-- Docked Input Form -->
+    <div class="prompt-dock">
+        <div class="dock-inner">
+            <form class="search-box-form" id="qa-form" onsubmit="handleQuerySubmit(event)">
+                <input
+                    type="text"
+                    id="query-input"
+                    class="search-input"
+                    placeholder="Ask a question about your indexed documents..."
+                    autocomplete="off"
+                    required
+                />
+                <button type="submit" id="submit-btn" class="submit-btn">
+                    <span>Ask AI</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast-box"></div>
+
+    <script>
+        // Check health on page load
+        async function checkHealth() {
+            try {
+                const res = await fetch('/health');
+                if (res.ok) {
+                    const data = await res.json();
+                    const statusText = document.getElementById('status-text');
+                    if (data.ollama_online) {
+                        statusText.textContent = `Ollama Online (${data.model || 'llama3'})`;
+                    } else {
+                        statusText.textContent = "Ollama Offline";
+                        document.querySelector('.status-dot').style.background = '#ef4444';
+                    }
+                }
+            } catch (err) {
+                console.warn("Health check unreachable:", err);
+            }
+        }
+        checkHealth();
+
+        function applyPrompt(text) {
+            const input = document.getElementById('query-input');
+            input.value = text;
+            input.focus();
+        }
+
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, duration);
+        }
+
+        async function handleQuerySubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('query-input');
+            const submitBtn = document.getElementById('submit-btn');
+            const skeleton = document.getElementById('loading-skeleton');
+            const feed = document.getElementById('results-feed');
+
+            const query = input.value.trim();
+            if (!query) return;
+
+            submitBtn.disabled = true;
+            skeleton.style.display = 'flex';
+            skeleton.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            try {
+                const res = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const data = await res.json();
+                skeleton.style.display = 'none';
+                submitBtn.disabled = false;
+
+                if (!res.ok) {
+                    renderErrorCard(query, data.detail || "Failed to process query.");
+                    return;
+                }
+
+                renderAnswerCard(query, data.answer, data.sources || []);
+                input.value = '';
+            } catch (err) {
+                skeleton.style.display = 'none';
+                submitBtn.disabled = false;
+                renderErrorCard(query, "Connection failure. Ensure the DocuMind AI server is running.");
+            }
+        }
+
+        function renderAnswerCard(query, answer, sources) {
+            const feed = document.getElementById('results-feed');
+            const card = document.createElement('div');
+            card.className = 'result-card';
+
+            let citationsHtml = '';
+            if (sources && sources.length > 0) {
+                const cardsHtml = sources.map(s => `
+                    <div class="citation-card">
+                        <div class="citation-top">
+                            <span class="citation-doc-name" title="${s.source}">${s.source}</span>
+                            <span class="citation-page-badge">Page ${s.page}</span>
+                        </div>
+                        <div class="citation-snippet">"${escapeHtml(s.snippet)}"</div>
+                    </div>
+                `).join('');
+
+                citationsHtml = `
+                    <div class="citations-section">
+                        <div class="citations-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Verified Evidence & Citations (${sources.length})
+                        </div>
+                        <div class="citations-grid">${cardsHtml}</div>
+                    </div>
+                `;
+            }
+
+            card.innerHTML = `
+                <div class="result-header">
+                    <div class="result-query-badge">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        ${escapeHtml(query)}
+                    </div>
+                    <button class="copy-btn" onclick="navigator.clipboard.writeText(\`${escapeJs(answer)}\`); showToast('Answer copied to clipboard!');">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Copy
+                    </button>
+                </div>
+                <div class="answer-body">${escapeHtml(answer)}</div>
+                ${citationsHtml}
+            `;
+
+            feed.prepend(card);
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function renderErrorCard(query, errorMessage) {
+            const feed = document.getElementById('results-feed');
+            const card = document.createElement('div');
+            card.className = 'result-card';
+            card.style.borderColor = '#ef4444';
+
+            card.innerHTML = `
+                <div class="result-header">
+                    <div class="result-query-badge" style="color:#ef4444;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        Query Failed: ${escapeHtml(query)}
+                    </div>
+                </div>
+                <div class="answer-body" style="color:#fca5a5;">${escapeHtml(errorMessage)}</div>
+            `;
+            feed.prepend(card);
+        }
+
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function escapeJs(text) {
+            return String(text).replace(/`/g, '\\`').replace(/\$/g, '\\$');
+        }
+    </script>
+</body>
+</html>

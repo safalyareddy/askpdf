@@ -1,0 +1,28 @@
+services:
+  documind-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: documind-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./db:/app/db
+    environment:
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - SUPER_USER_KEY=${SUPER_USER_KEY:-documind-dev-supersecretkey-change-in-prod}
+      - LLM_MODEL=${LLM_MODEL:-llama3}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+      - PERSIST_DIR=/app/db
+      - PDF_DIR=/app/data
+      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-20}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
