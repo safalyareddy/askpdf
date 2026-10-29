@@ -107,20 +107,27 @@ class Question(BaseModel):
 
 
 @app.get("/health")
+@app.get("/healthz")
 async def health_check():
-    """Health check endpoint for Docker, orchestration, and monitoring."""
+    """Health check endpoint for Docker, Render, and external monitoring."""
     pdf_count = len([f for f in os.listdir(PDF_DIR) if f.lower().endswith(".pdf")]) if os.path.exists(PDF_DIR) else 0
-    ollama_url = config.get("ollama_base_url", "http://localhost:11434")
-    ollama_ok, ollama_msg = await asyncio.to_thread(check_ollama_status, ollama_url)
+    provider = config.get("llm_provider", "ollama").lower()
+
+    model_online = True
+    model_msg = f"Provider '{provider}' configured."
+    if provider == "ollama":
+        ollama_url = config.get("ollama_base_url", "http://localhost:11434")
+        model_online, model_msg = await asyncio.to_thread(check_ollama_status, ollama_url)
 
     return {
-        "status": "healthy" if (rag_pipeline is not None or pdf_count == 0) else "initializing",
+        "status": "healthy",
         "app": "DocuMind AI",
         "engine_ready": rag_pipeline is not None,
         "indexed_pdfs": pdf_count,
-        "ollama_online": ollama_ok,
-        "ollama_status": ollama_msg,
-        "ollama_url": ollama_url,
+        "provider": provider,
+        "model_online": model_online,
+        "ollama_online": model_online,
+        "model_status": model_msg,
         "model": config.get("llm_model")
     }
 

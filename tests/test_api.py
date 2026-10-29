@@ -16,6 +16,11 @@ def test_health_check():
     assert "indexed_pdfs" in data
     assert "ollama_online" in data
 
+    # Verify /healthz alias
+    res_z = client.get("/healthz")
+    assert res_z.status_code == 200
+    assert res_z.json()["status"] == "healthy"
+
 
 def test_html_pages():
     res_home = client.get("/")

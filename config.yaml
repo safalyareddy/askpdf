@@ -1,4 +1,8 @@
+# DocuMind AI Core Configuration
+llm_provider: "ollama"
 llm_model: "llama3"
+llm_base_url: "http://localhost:11434"
+llm_api_key: ""
 embedding_model: "BAAI/bge-small-en-v1.5"
 ollama_base_url: "http://localhost:11434"
 pdf_dir: "./data/"

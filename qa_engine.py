@@ -12,15 +12,55 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
+from langchain_core.language_models.llms import LLM
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("documind.engine")
 
 
+class OpenAILikeLLM(LLM):
+    """Universal OpenAI-compatible chat completions wrapper (Groq, Together, OpenRouter, vLLM, OpenAI)."""
+    base_url: str = "https://api.openai.com/v1"
+    api_key: str = ""
+    model: str = "llama-3.1-8b-instant"
+    temperature: float = 0.1
+    timeout_sec: float = 60.0
+
+    @property
+    def _llm_type(self) -> str:
+        return "openai_compatible"
+
+    def _call(self, prompt: str, stop: Optional[List[str]] = None, **kwargs: Any) -> str:
+        url = self.base_url.rstrip("/") + "/chat/completions"
+        headers = {
+            "Content-Type": "application/json"
+        }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": self.temperature
+        }
+        try:
+            with httpx.Client(timeout=self.timeout_sec) as client:
+                res = client.post(url, json=payload, headers=headers)
+                res.raise_for_status()
+                data = res.json()
+                return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.error(f"Inference error calling {url} (model {self.model}): {e}")
+            raise
+
+
 def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
     """Loads configuration with defaults and environment variable overrides."""
     config: Dict[str, Any] = {
+        "llm_provider": "ollama",
         "llm_model": "llama3",
+        "llm_base_url": "http://localhost:11434",
+        "llm_api_key": "",
         "embedding_model": "BAAI/bge-small-en-v1.5",
         "ollama_base_url": "http://localhost:11434",
         "pdf_dir": "./data/",
@@ -43,8 +83,14 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
             logger.warning(f"Error loading {config_path}: {e}. Utilizing fallback defaults.")
 
     # Environment variable overrides
+    if os.getenv("LLM_PROVIDER"):
+        config["llm_provider"] = os.getenv("LLM_PROVIDER")
     if os.getenv("LLM_MODEL"):
         config["llm_model"] = os.getenv("LLM_MODEL")
+    if os.getenv("LLM_BASE_URL"):
+        config["llm_base_url"] = os.getenv("LLM_BASE_URL")
+    if os.getenv("LLM_API_KEY"):
+        config["llm_api_key"] = os.getenv("LLM_API_KEY")
     if os.getenv("EMBEDDING_MODEL"):
         config["embedding_model"] = os.getenv("EMBEDDING_MODEL")
     if os.getenv("OLLAMA_BASE_URL"):
@@ -183,7 +229,7 @@ def build_or_load_vectorstore(
 
 
 class RAGPipeline:
-    def __init__(self, vectorstore: Optional[Chroma], llm: OllamaLLM, top_k: int = 4):
+    def __init__(self, vectorstore: Optional[Chroma], llm: Any, top_k: int = 4):
         self.vectorstore = vectorstore
         self.llm = llm
         self.top_k = top_k
@@ -258,7 +304,7 @@ class RAGPipeline:
             err_msg = str(e).lower()
             if "connection refused" in err_msg or "connect" in err_msg:
                 return {
-                    "answer": "Unable to connect to Ollama. Please ensure Ollama is running (`ollama serve`) and has the required model.",
+                    "answer": "Unable to connect to model service. Please verify your configured endpoint and credentials.",
                     "sources": sources
                 }
             elif "timed out" in err_msg or "timeout" in err_msg:
@@ -267,7 +313,7 @@ class RAGPipeline:
                     "sources": sources
                 }
             return {
-                "answer": "Failed to generate answer from the language model. Please verify that Ollama is operational.",
+                "answer": "Failed to generate answer from the language model. Please verify that the inference provider is operational.",
                 "sources": sources
             }
 
@@ -280,13 +326,14 @@ class RAGPipeline:
 def initialize_qa_engine(config_path: str = "config.yaml") -> Tuple[Optional[RAGPipeline], Dict[str, Any]]:
     """
     Initializes embeddings, scans pdf_dir, builds the vectorstore, and configures RAGPipeline.
+    Supports local Ollama and hosted OpenAI-compatible providers (Groq, Together, OpenRouter, etc.).
     """
     config = load_config(config_path)
     pdf_dir = config["pdf_dir"]
     persist_dir = config["persist_dir"]
     chunk_size = config.get("chunk_size", 500)
     chunk_overlap = config.get("chunk_overlap", 100)
-    ollama_url = config.get("ollama_base_url", "http://localhost:11434")
+    provider = config.get("llm_provider", "ollama").lower()
     model_name = config.get("llm_model", "llama3")
     embedding_model = config.get("embedding_model", "BAAI/bge-small-en-v1.5")
     timeout_sec = float(config.get("ollama_timeout_seconds", 60))
@@ -305,13 +352,27 @@ def initialize_qa_engine(config_path: str = "config.yaml") -> Tuple[Optional[RAG
     embedding_fn = get_embedding_function(embedding_model)
     vectorstore = build_or_load_vectorstore(all_documents, embedding_fn, persist_dir)
 
-    logger.info(f"Configuring Ollama client at {ollama_url} (model: '{model_name}', timeout: {timeout_sec}s)...")
-    llm = OllamaLLM(
-        base_url=ollama_url,
-        model=model_name,
-        temperature=0.1,
-        timeout=timeout_sec
-    )
+    # Initialize appropriate LLM provider
+    if provider in ["openai", "groq", "together", "openrouter", "openai_compatible"]:
+        base_url = config.get("llm_base_url") or os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
+        api_key = config.get("llm_api_key") or os.getenv("LLM_API_KEY", "")
+        logger.info(f"Configuring hosted inference client ({provider}) at {base_url} (model: '{model_name}')...")
+        llm = OpenAILikeLLM(
+            base_url=base_url,
+            api_key=api_key,
+            model=model_name,
+            temperature=0.1,
+            timeout_sec=timeout_sec
+        )
+    else:
+        ollama_url = config.get("ollama_base_url", "http://localhost:11434")
+        logger.info(f"Configuring Ollama client at {ollama_url} (model: '{model_name}', timeout: {timeout_sec}s)...")
+        llm = OllamaLLM(
+            base_url=ollama_url,
+            model=model_name,
+            temperature=0.1,
+            timeout=timeout_sec
+        )
 
     pipeline = RAGPipeline(vectorstore=vectorstore, llm=llm) if vectorstore else None
     return pipeline, config

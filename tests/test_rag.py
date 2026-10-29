@@ -88,7 +88,7 @@ def test_rag_pipeline_handles_llm_connection_error():
     pipeline = RAGPipeline(vectorstore=mock_vectorstore, llm=mock_llm)
     result = pipeline.answer_query("Query")
 
-    assert "Unable to connect to Ollama" in result["answer"]
+    assert "Unable to connect" in result["answer"]
     assert len(result["sources"]) == 1
 
 
@@ -97,3 +97,26 @@ def test_check_ollama_status_offline():
     is_online, msg = check_ollama_status("http://127.0.0.1:9999", timeout=0.5)
     assert not is_online
     assert "Could not connect to Ollama" in msg
+
+
+def test_openai_like_llm_wrapper():
+    from qa_engine import OpenAILikeLLM
+    from unittest.mock import patch, MagicMock
+
+    llm = OpenAILikeLLM(
+        base_url="https://api.groq.com/openai/v1",
+        api_key="mock_key",
+        model="llama-3.1-8b-instant"
+    )
+    assert llm._llm_type == "openai_compatible"
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": "DocuMind AI answer via cloud API"}}]
+    }
+
+    with patch("httpx.Client.post", return_value=mock_resp):
+        res = llm.invoke("Test prompt")
+        assert "DocuMind AI answer" in res
+
