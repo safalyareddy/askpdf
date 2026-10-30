@@ -8,7 +8,14 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger("documind.registry")
 
-REGISTRY_PATH = "./db/documents_registry.json"
+def get_registry_path() -> str:
+    persist_dir = os.getenv("PERSIST_DIR", "./db")
+    if persist_dir.startswith("/app") and not os.path.exists("/app"):
+        persist_dir = "./db"
+    return os.path.join(persist_dir, "documents_registry.json")
+
+
+REGISTRY_PATH = get_registry_path()
 
 
 def _generate_doc_id(filename: str) -> str:
@@ -18,8 +25,8 @@ def _generate_doc_id(filename: str) -> str:
 
 
 class DocumentRegistry:
-    def __init__(self, registry_file: str = REGISTRY_PATH):
-        self.registry_file = registry_file
+    def __init__(self, registry_file: Optional[str] = None):
+        self.registry_file = registry_file or get_registry_path()
         self.documents: Dict[str, Dict[str, Any]] = {}
         self.load()
 

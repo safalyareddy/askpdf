@@ -211,6 +211,21 @@ async def health_check():
     }
 
 
+@app.get("/models")
+async def get_models():
+    """Returns active model metadata, provider status, and supported options."""
+    provider = config.get("llm_provider", "ollama").lower()
+    model = config.get("llm_model", "llama3")
+    return {
+        "status": "online",
+        "current_provider": provider,
+        "current_model": model,
+        "embedding_model": config.get("embedding_model", "BAAI/bge-small-en-v1.5"),
+        "supported_providers": ["groq", "openai_compatible", "ollama"],
+        "recommended_cloud_model": "llama-3.3-70b-versatile"
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Serves the main AskPDF question answering UI."""
@@ -290,6 +305,12 @@ async def ask_question(question: Question, request: Request):
             status_code=500,
             detail="An internal error occurred while generating the answer. Please check server logs."
         )
+
+
+@app.post("/predict")
+async def predict(question: Question, request: Request):
+    """Alias for /ask to support standard prediction clients."""
+    return await ask_question(question, request)
 
 
 @app.get("/admin", response_class=HTMLResponse)

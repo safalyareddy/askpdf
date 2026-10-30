@@ -184,3 +184,24 @@ def test_ask_with_session_and_document_id():
         assert res.status_code == 200
         mock_pipeline.answer_query.assert_called_once()
 
+
+def test_models_endpoint():
+    res = client.get("/models")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "online"
+    assert "current_provider" in data
+    assert "current_model" in data
+    assert "supported_providers" in data
+
+
+def test_predict_alias():
+    with patch("main.rag_pipeline") as mock_pipeline:
+        mock_pipeline.answer_query.return_value = {
+            "answer": "Prediction result.",
+            "sources": []
+        }
+        res = client.post("/predict", json={"query": "Test predict"})
+        assert res.status_code == 200
+        assert res.json()["answer"] == "Prediction result."
+

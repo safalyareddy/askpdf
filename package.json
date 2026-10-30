@@ -1,0 +1,9 @@
+{
+  "name": "askpdf",
+  "version": "2.0.0",
+  "description": "AskPDF — Your documents. Your answers.",
+  "private": true,
+  "scripts": {
+    "build": "bash build.sh"
+  }
+}
