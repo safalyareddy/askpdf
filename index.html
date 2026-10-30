@@ -911,7 +911,7 @@
             loadDocumentPills();
         }
 
-        // Check health on page load
+        // Check health on page load and periodic retry for cold starts
         async function checkHealth() {
             const statusText = document.getElementById('status-text');
             const dot = document.querySelector('.status-dot');
@@ -941,11 +941,12 @@
                 }
             } catch (err) {
                 console.warn("Health check unreachable:", err);
-                if (statusText) statusText.textContent = "Backend Unreachable";
-                if (dot) dot.style.background = '#ef4444';
+                if (statusText) statusText.textContent = "Backend Cold Start / Reconnecting...";
+                if (dot) dot.style.background = '#f59e0b';
             }
         }
         checkHealth();
+        setInterval(checkHealth, 25000);
 
         // Load available documents for pill selector
         async function loadDocumentPills() {
@@ -1054,11 +1055,8 @@
 
                 renderAnswerCard(query, data.answer, data.sources || [], data.active_document);
                 input.value = '';
-
-                // If query resolved to a specific document, update pill state
-                if (data.active_document && selectedDocument === 'all') {
-                    // Update session pills without changing default
-                }
+                checkHealth();
+                loadDocumentPills();
             } catch (err) {
                 skeleton.style.display = 'none';
                 submitBtn.disabled = false;
