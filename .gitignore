@@ -36,3 +36,12 @@ htmlcov/
 scratch/
 public/
 dist/
+
+# Keys, Certs, and Local Server Volumes
+*.key
+*.pem
+*.crt
+storage/
+backups/
+caddy_data/
+caddy_config/
