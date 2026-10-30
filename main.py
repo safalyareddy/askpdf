@@ -12,7 +12,7 @@ from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, UploadFile, File, Form, Header, Query, HTTPException, status
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -154,17 +154,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Production CORS configuration: allow Vercel production, preview branches, and localhost
+# Production CORS configuration: allow Render, Vercel, and local execution
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://documind-ai-ddt8.onrender.com",
         "https://askpdf-omega.vercel.app",
         "http://localhost:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
         "http://127.0.0.1:5500",
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=r"https://.*(\.onrender\.com|\.vercel\.app)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -321,7 +322,17 @@ async def predict(question: Question, request: Request):
     return await ask_question(question, request)
 
 
+@app.get("/config.js")
+async def get_config_js():
+    """Serves runtime JavaScript configuration using the request's origin."""
+    return Response(
+        content='window.ASKPDF_API_URL = window.location.origin;\n',
+        media_type="application/javascript"
+    )
+
+
 @app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin.html", response_class=HTMLResponse)
 async def admin_page(request: Request):
     """Serves the Document Admin portal."""
     return templates.TemplateResponse(request=request, name="admin.html")

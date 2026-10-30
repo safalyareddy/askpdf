@@ -34,6 +34,14 @@ def test_html_pages():
     assert "AskPDF" in res_admin.text
     assert "Document Management" in res_admin.text
 
+    res_admin_html = client.get("/admin.html")
+    assert res_admin_html.status_code == 200
+    assert "Document Management" in res_admin_html.text
+
+    res_config = client.get("/config.js")
+    assert res_config.status_code == 200
+    assert "window.ASKPDF_API_URL" in res_config.text
+
 
 def test_ask_empty_query():
     response = client.post("/ask", json={"query": ""})

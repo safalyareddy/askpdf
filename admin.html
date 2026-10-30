@@ -412,10 +412,7 @@
             if (saved && saved.trim()) {
                 return saved.trim().replace(/\/+$/, '');
             }
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                return '';
-            }
-            return null;
+            return window.location.origin;
         }
 
         // Strictly use sessionStorage to prevent credential persistence across browser reboots
@@ -484,7 +481,7 @@
                 tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:#f59e0b; padding: 2.5rem 1rem;">
                     <div style="font-weight:700; font-size:1rem; margin-bottom:0.4rem;">Backend Service Not Connected</div>
                     <div style="font-size:0.85rem; color:var(--text-muted); max-width:480px; margin:0 auto; line-height:1.5;">
-                        The frontend is live, but the production backend URL has not yet been connected. Once your backend is deployed, set <code>ASKPDF_API_URL</code> on Vercel to automatically connect.
+                        Backend service is not reachable. Verify that the AskPDF instance is running and accessible.
                     </div>
                 </td></tr>`;
                 return;
@@ -548,7 +545,7 @@
 
             const apiBase = getApiBaseUrl();
             if (apiBase === null) {
-                statusBox.innerHTML = `<span style="color:#f59e0b;">Backend service is not connected. Configure <code>ASKPDF_API_URL</code> on Vercel.</span>`;
+                statusBox.innerHTML = `<span style="color:#f59e0b;">Backend service is not connected.</span>`;
                 showToast("Backend service not connected.", true);
                 return;
             }

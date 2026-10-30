@@ -872,10 +872,7 @@
             if (saved && saved.trim()) {
                 return saved.trim().replace(/\/+$/, '');
             }
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                return '';
-            }
-            return null;
+            return window.location.origin;
         }
 
         function openBackendModal() {
@@ -1009,7 +1006,7 @@
 
             const apiBase = getApiBaseUrl();
             if (apiBase === null) {
-                renderErrorCard(query, "Production backend service is not connected yet. Please deploy the backend and configure ASKPDF_API_URL on Vercel.");
+                renderErrorCard(query, "Backend service connection failure. Please verify that the AskPDF server is running.");
                 return;
             }
 
@@ -1188,11 +1185,11 @@
                 <button type="button" class="modal-close-btn" onclick="closeBackendModal()">&times;</button>
             </div>
             <p style="font-size:0.85rem; color:var(--text-muted); line-height:1.5;">
-                AskPDF connects automatically to your production backend via the <code>ASKPDF_API_URL</code> environment variable on Vercel. You can also specify an override backend URL below for development or testing.
+                AskPDF runs frontend and backend unified on Render. You can also specify an override backend URL below for development or custom instances.
             </p>
             <div style="display:flex; flex-direction:column; gap:0.45rem;">
                 <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.04em;">Backend API URL</label>
-                <input type="url" id="backend-url-input" class="search-input" style="background:var(--surface); border:1px solid var(--border); padding:0.65rem 0.85rem; border-radius:var(--radius-sm); font-size:0.9rem;" placeholder="https://your-backend.fly.dev or http://localhost:8000">
+                <input type="url" id="backend-url-input" class="search-input" style="background:var(--surface); border:1px solid var(--border); padding:0.65rem 0.85rem; border-radius:var(--radius-sm); font-size:0.9rem;" placeholder="https://documind-ai-ddt8.onrender.com or http://localhost:8000">
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
                 <button type="button" class="admin-link-btn" onclick="resetBackendUrl()" style="font-size:0.8rem;">Reset Default</button>
