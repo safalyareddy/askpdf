@@ -4,6 +4,7 @@ import yaml
 import logging
 import functools
 from typing import List, Dict, Any, Tuple, Optional
+import gc
 import httpx
 import pypdf
 from langchain_core.documents import Document
@@ -22,7 +23,7 @@ class OpenAILikeLLM(LLM):
     """Universal OpenAI-compatible chat completions wrapper (Groq, Together, OpenRouter, vLLM, OpenAI)."""
     base_url: str = "https://api.openai.com/v1"
     api_key: str = ""
-    model: str = "llama-3.1-8b-instant"
+    model: str = "llama-3.3-70b-versatile"
     temperature: float = 0.1
     timeout_sec: float = 60.0
 
@@ -31,27 +32,60 @@ class OpenAILikeLLM(LLM):
         return "openai_compatible"
 
     def _call(self, prompt: str, stop: Optional[List[str]] = None, **kwargs: Any) -> str:
-        url = self.base_url.rstrip("/") + "/chat/completions"
+        clean_base = self.base_url.strip().rstrip("/")
+        if clean_base.endswith("/chat/completions"):
+            url = clean_base
+        else:
+            url = f"{clean_base}/chat/completions"
+
         headers = {
             "Content-Type": "application/json"
         }
         if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+            headers["Authorization"] = f"Bearer {self.api_key.strip()}"
 
-        payload = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": self.temperature
-        }
-        try:
-            with httpx.Client(timeout=self.timeout_sec) as client:
-                res = client.post(url, json=payload, headers=headers)
-                res.raise_for_status()
-                data = res.json()
-                return data["choices"][0]["message"]["content"]
-        except Exception as e:
-            logger.error(f"Inference error calling {url} (model {self.model}): {e}")
-            raise
+        candidate_models = [self.model]
+        if "groq.com" in clean_base:
+            for fallback in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-20b"]:
+                if fallback not in candidate_models:
+                    candidate_models.append(fallback)
+
+        last_error = None
+        for candidate in candidate_models:
+            payload = {
+                "model": candidate,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": self.temperature
+            }
+            try:
+                with httpx.Client(timeout=self.timeout_sec) as client:
+                    res = client.post(url, json=payload, headers=headers)
+                    if res.status_code == 200:
+                        data = res.json()
+                        return data["choices"][0]["message"]["content"]
+
+                    err_text = res.text
+                    try:
+                        err_json = res.json()
+                        if "error" in err_json and "message" in err_json["error"]:
+                            err_text = err_json["error"]["message"]
+                    except Exception:
+                        pass
+
+                    last_error = f"HTTP {res.status_code} ({err_text})"
+                    logger.warning(f"Inference attempt with model '{candidate}' returned {last_error}")
+
+                    if res.status_code == 404 and candidate != candidate_models[-1]:
+                        next_idx = candidate_models.index(candidate) + 1
+                        logger.info(f"Retrying inference with next model '{candidate_models[next_idx]}'...")
+                        continue
+                    break
+            except Exception as e:
+                logger.error(f"Inference connection error calling {url} (model {candidate}): {e}")
+                last_error = str(e)
+                break
+
+        raise RuntimeError(f"Hosted LLM error: {last_error}")
 
 
 def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
@@ -183,12 +217,12 @@ def extract_pdf_documents(
 
 @functools.lru_cache(maxsize=4)
 def get_embedding_function(model_name: str) -> HuggingFaceEmbeddings:
-    """Initializes and caches the local HuggingFace embedding model."""
+    """Initializes and caches the local HuggingFace embedding model with memory-safe batch size."""
     logger.info(f"Loading embedding model: {model_name}")
     return HuggingFaceEmbeddings(
         model_name=model_name,
         model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True}
+        encode_kwargs={"normalize_embeddings": True, "batch_size": 16}
     )
 
 
@@ -200,6 +234,7 @@ def build_or_load_vectorstore(
     """
     Builds or updates a Chroma vectorstore in persist_dir.
     Resets existing collection before inserting new documents to prevent stale chunks.
+    Batches chunk insertions to stay well within 512MB RAM constraints on cloud hosts.
     """
     os.makedirs(persist_dir, exist_ok=True)
 
@@ -221,7 +256,11 @@ def build_or_load_vectorstore(
 
     if documents:
         logger.info(f"Indexing {len(documents)} document chunks into Chroma vectorstore at '{persist_dir}'...")
-        vectorstore.add_documents(documents)
+        batch_size = 16
+        for i in range(0, len(documents), batch_size):
+            batch = documents[i:i + batch_size]
+            vectorstore.add_documents(batch)
+            gc.collect()
         return vectorstore
 
     logger.info("No documents provided; vectorstore initialized as empty.")
@@ -301,19 +340,30 @@ class RAGPipeline:
             answer_text = response.strip() if isinstance(response, str) else str(response).strip()
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
-            err_msg = str(e).lower()
-            if "connection refused" in err_msg or "connect" in err_msg:
+            err_msg = str(e)
+            err_lower = err_msg.lower()
+            if "connection refused" in err_lower or "connect" in err_lower:
                 return {
                     "answer": "Unable to connect to model service. Please verify your configured endpoint and credentials.",
                     "sources": sources
                 }
-            elif "timed out" in err_msg or "timeout" in err_msg:
+            elif "timed out" in err_lower or "timeout" in err_lower:
                 return {
                     "answer": "The language model timed out while processing your request. Please try again or query a shorter passage.",
                     "sources": sources
                 }
+            elif "401" in err_msg or "invalid api key" in err_lower:
+                return {
+                    "answer": "Authentication failed with the LLM provider (Invalid API Key). Please verify that your LLM_API_KEY environment variable is configured correctly in Render.",
+                    "sources": sources
+                }
+            elif "404" in err_msg or "model_not_found" in err_lower:
+                return {
+                    "answer": f"Configured model was not found on the hosted inference provider ({err_msg}). Please set LLM_MODEL in Render environment settings to an active model such as 'llama-3.3-70b-versatile'.",
+                    "sources": sources
+                }
             return {
-                "answer": "Failed to generate answer from the language model. Please verify that the inference provider is operational.",
+                "answer": f"Language model error: {err_msg}",
                 "sources": sources
             }
 

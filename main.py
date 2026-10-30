@@ -4,6 +4,7 @@ import shutil
 import re
 import logging
 import asyncio
+import gc
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
@@ -58,21 +59,26 @@ def verify_admin_key(
     return True
 
 
-async def reinitialize_qa_engine():
-    """Reindexes all PDFs in PDF_DIR into PERSIST_DIR."""
+async def _reinitialize_qa_engine_unlocked():
+    """Internal helper to reindex all PDFs into PERSIST_DIR without acquiring engine_lock."""
     global rag_pipeline
-    async with engine_lock:
-        logger.info("Reinitializing DocuMind AI QA Engine...")
-        os.makedirs(PDF_DIR, exist_ok=True)
-        os.makedirs(PERSIST_DIR, exist_ok=True)
+    logger.info("Reinitializing DocuMind AI QA Engine...")
+    os.makedirs(PDF_DIR, exist_ok=True)
+    os.makedirs(PERSIST_DIR, exist_ok=True)
 
-        try:
-            pipeline, _ = await asyncio.to_thread(initialize_qa_engine, "config.yaml")
-            rag_pipeline = pipeline
-            logger.info("DocuMind AI QA Engine initialized successfully.")
-        except Exception as e:
-            logger.error(f"Failed to reinitialize QA engine: {e}", exc_info=True)
-            rag_pipeline = None
+    try:
+        pipeline, _ = await asyncio.to_thread(initialize_qa_engine, "config.yaml")
+        rag_pipeline = pipeline
+        logger.info("DocuMind AI QA Engine initialized successfully.")
+    except Exception as e:
+        logger.error(f"Failed to reinitialize QA engine: {e}", exc_info=True)
+        rag_pipeline = None
+
+
+async def reinitialize_qa_engine():
+    """Reindexes all PDFs in PDF_DIR into PERSIST_DIR with lock protection."""
+    async with engine_lock:
+        await _reinitialize_qa_engine_unlocked()
 
 
 @asynccontextmanager
@@ -232,8 +238,15 @@ async def upload_pdf(
     if chars == 0:
         ocr_notice = " Note: No digital text was detected (scanned or image-only PDFs require an OCR engine, which is not currently enabled)."
 
-    # Re-index pipeline
-    await reinitialize_qa_engine()
+    # Incremental indexing with memory-safe batches of 16
+    async with engine_lock:
+        if rag_pipeline and rag_pipeline.vectorstore and docs:
+            batch_size = 16
+            for i in range(0, len(docs), batch_size):
+                await asyncio.to_thread(rag_pipeline.vectorstore.add_documents, docs[i:i + batch_size])
+                gc.collect()
+        else:
+            await _reinitialize_qa_engine_unlocked()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -289,7 +302,14 @@ async def delete_pdf(
     try:
         os.remove(path)
         logger.info(f"Deleted document from storage: {safe_name}")
-        await reinitialize_qa_engine()
+        async with engine_lock:
+            if rag_pipeline and rag_pipeline.vectorstore:
+                try:
+                    await asyncio.to_thread(rag_pipeline.vectorstore.delete, where={"source": safe_name})
+                except Exception:
+                    await _reinitialize_qa_engine_unlocked()
+            else:
+                await _reinitialize_qa_engine_unlocked()
         return JSONResponse(content={"message": f"'{safe_name}' deleted and vector index updated."})
     except Exception as e:
         logger.error(f"Failed to delete document '{safe_name}': {e}", exc_info=True)
