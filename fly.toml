@@ -1,0 +1,38 @@
+# Fly.io deployment specification for AskPDF Production Backend
+app = "askpdf-backend"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+  STORAGE_DIR = "/app/storage"
+  LLM_PROVIDER = "openai_compatible"
+  LLM_BASE_URL = "https://api.groq.com/openai/v1"
+  LLM_MODEL = "llama-3.3-70b-versatile"
+  EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
+  MAX_UPLOAD_SIZE_MB = "20"
+
+[[mounts]]
+  source = "askpdf_storage"
+  destination = "/app/storage"
+  initial_size = "5gb"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "35s"
+    interval = "20s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1024mb"

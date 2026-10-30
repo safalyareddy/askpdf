@@ -868,16 +868,19 @@
             if (window.ASKPDF_API_URL && typeof window.ASKPDF_API_URL === 'string' && window.ASKPDF_API_URL.trim()) {
                 return window.ASKPDF_API_URL.trim().replace(/\/+$/, '');
             }
-            const saved = localStorage.getItem('askpdf_backend_url');
+            const saved = sessionStorage.getItem('askpdf_backend_url') || localStorage.getItem('askpdf_backend_url');
             if (saved && saved.trim()) {
                 return saved.trim().replace(/\/+$/, '');
             }
-            return '';
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                return '';
+            }
+            return null;
         }
 
         function openBackendModal() {
             const input = document.getElementById('backend-url-input');
-            input.value = localStorage.getItem('askpdf_backend_url') || '';
+            input.value = sessionStorage.getItem('askpdf_backend_url') || localStorage.getItem('askpdf_backend_url') || '';
             document.getElementById('backend-modal').style.display = 'flex';
         }
 
@@ -892,6 +895,7 @@
                 localStorage.setItem('askpdf_backend_url', val);
             } else {
                 localStorage.removeItem('askpdf_backend_url');
+                sessionStorage.removeItem('askpdf_backend_url');
             }
             closeBackendModal();
             checkHealth();
@@ -900,6 +904,7 @@
 
         function resetBackendUrl() {
             localStorage.removeItem('askpdf_backend_url');
+            sessionStorage.removeItem('askpdf_backend_url');
             document.getElementById('backend-url-input').value = '';
             closeBackendModal();
             checkHealth();
@@ -908,13 +913,21 @@
 
         // Check health on page load
         async function checkHealth() {
+            const statusText = document.getElementById('status-text');
+            const dot = document.querySelector('.status-dot');
+            const apiBase = getApiBaseUrl();
+
+            if (apiBase === null) {
+                if (statusText) statusText.textContent = "Connecting to Backend...";
+                if (dot) dot.style.background = '#f59e0b';
+                return;
+            }
+
             try {
-                const res = await fetch(`${getApiBaseUrl()}/health`);
+                const res = await fetch(`${apiBase}/health`);
                 if (res.ok) {
                     const data = await res.json();
-                    const statusText = document.getElementById('status-text');
-                    const dot = document.querySelector('.status-dot');
-                    const providerLabel = data.provider === 'ollama' ? 'Ollama' : data.provider.toUpperCase();
+                    const providerLabel = data.provider === 'ollama' ? 'Ollama' : (data.provider || '').toUpperCase();
                     if (data.model_online) {
                         statusText.textContent = `${providerLabel} Online (${data.model || 'Active'})`;
                         dot.style.background = '#10b981';
@@ -922,17 +935,31 @@
                         statusText.textContent = `${providerLabel} Offline`;
                         dot.style.background = '#ef4444';
                     }
+                } else {
+                    if (statusText) statusText.textContent = "Backend Offline";
+                    if (dot) dot.style.background = '#ef4444';
                 }
             } catch (err) {
                 console.warn("Health check unreachable:", err);
+                if (statusText) statusText.textContent = "Backend Unreachable";
+                if (dot) dot.style.background = '#ef4444';
             }
         }
         checkHealth();
 
         // Load available documents for pill selector
         async function loadDocumentPills() {
+            const apiBase = getApiBaseUrl();
+            if (apiBase === null) {
+                const container = document.getElementById('doc-pills-container');
+                if (container) {
+                    container.innerHTML = `<div class="doc-pill active" onclick="selectDocument('all')">All Documents (0)</div>`;
+                }
+                return;
+            }
+
             try {
-                const res = await fetch(`${getApiBaseUrl()}/documents`);
+                const res = await fetch(`${apiBase}/documents`);
                 if (!res.ok) return;
                 const data = await res.json();
                 const container = document.getElementById('doc-pills-container');
@@ -979,6 +1006,12 @@
             const query = input.value.trim();
             if (!query) return;
 
+            const apiBase = getApiBaseUrl();
+            if (apiBase === null) {
+                renderErrorCard(query, "Production backend service is not connected yet. Please deploy the backend and configure ASKPDF_API_URL on Vercel.");
+                return;
+            }
+
             submitBtn.disabled = true;
             skeleton.style.display = 'flex';
             skeleton.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -990,7 +1023,7 @@
                     document_id: selectedDocument !== 'all' ? selectedDocument : null
                 };
 
-                const res = await fetch(`${getApiBaseUrl()}/ask`, {
+                const res = await fetch(`${apiBase}/ask`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -1157,11 +1190,11 @@
                 <button type="button" class="modal-close-btn" onclick="closeBackendModal()">&times;</button>
             </div>
             <p style="font-size:0.85rem; color:var(--text-muted); line-height:1.5;">
-                When running the frontend on Vercel, specify your production Railway backend domain. Leave empty to use default same-origin relative endpoints.
+                AskPDF connects automatically to your production backend via the <code>ASKPDF_API_URL</code> environment variable on Vercel. You can also specify an override backend URL below for development or testing.
             </p>
             <div style="display:flex; flex-direction:column; gap:0.45rem;">
-                <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.04em;">Production Backend URL</label>
-                <input type="url" id="backend-url-input" class="search-input" style="background:var(--surface); border:1px solid var(--border); padding:0.65rem 0.85rem; border-radius:var(--radius-sm); font-size:0.9rem;" placeholder="https://askpdf-production.up.railway.app">
+                <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.04em;">Backend API URL</label>
+                <input type="url" id="backend-url-input" class="search-input" style="background:var(--surface); border:1px solid var(--border); padding:0.65rem 0.85rem; border-radius:var(--radius-sm); font-size:0.9rem;" placeholder="https://your-backend.fly.dev or http://localhost:8000">
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
                 <button type="button" class="admin-link-btn" onclick="resetBackendUrl()" style="font-size:0.8rem;">Reset Default</button>
