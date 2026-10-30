@@ -34,3 +34,5 @@ htmlcov/
 .DS_Store
 *.log
 scratch/
+public/
+dist/
