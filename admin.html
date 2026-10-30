@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocuMind AI — Document Admin Portal</title>
-    <meta name="description" content="Secure administrative management and indexing portal for DocuMind AI.">
+    <title>AskPDF — Document Management Portal</title>
+    <meta name="description" content="AskPDF — Secure administrative management, upload, and indexing portal.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
         :root {
             --bg: #090d16;
             --surface: #111827;
-            --surface-card: rgba(17, 24, 39, 0.75);
+            --surface-card: rgba(17, 24, 39, 0.8);
             --surface-hover: #1f2937;
             --primary: #38bdf8;
             --primary-glow: rgba(56, 189, 248, 0.25);
@@ -271,7 +271,7 @@
         }
 
         th {
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.25);
             padding: 0.85rem 1.5rem;
             color: var(--text-muted);
             font-weight: 600;
@@ -329,8 +329,8 @@
                     </svg>
                 </div>
                 <div class="brand-text">
-                    <h1>DocuMind AI</h1>
-                    <p style="font-size:0.75rem; color:var(--text-muted);">Admin Portal</p>
+                    <h1>AskPDF</h1>
+                    <p style="font-size:0.75rem; color:var(--text-muted);">Document Management</p>
                 </div>
             </a>
             <a href="/" class="back-link">
@@ -348,7 +348,7 @@
                 <span>Admin Authorization Key</span>
             </div>
             <div class="auth-input-group">
-                <input type="password" id="admin-key-input" class="auth-input" placeholder="Enter X-Admin-Key..." />
+                <input type="password" id="admin-key-input" class="auth-input" placeholder="Enter X-Admin-Key..." onkeydown="if(event.key==='Enter') saveAdminKey()" />
                 <button class="btn btn-primary" onclick="saveAdminKey()">Save Key</button>
             </div>
         </section>
@@ -362,7 +362,7 @@
                 <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
             <div class="upload-title">Drop PDF document here or browse</div>
-            <div class="upload-hint">PDF signature checked • Max 20 MB • Digital text auto-indexed with ChromaDB</div>
+            <div class="upload-hint">PDF magic bytes validated • Max 20 MB • Page-level citations & digital text indexed with ChromaDB</div>
             <button type="button" class="btn btn-primary" style="margin: 0 auto;">Select PDF File</button>
         </section>
 
@@ -384,13 +384,16 @@
                 <table>
                     <thead>
                         <tr>
+                            <th>Order</th>
                             <th>Document Name</th>
+                            <th>Pages</th>
+                            <th>Chunks</th>
                             <th>Size (KB)</th>
                             <th style="text-align:right;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="docs-tbody">
-                        <tr><td colspan="3" class="empty-state">Loading documents...</td></tr>
+                        <tr><td colspan="6" class="empty-state">Loading documents...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -400,22 +403,23 @@
     <div id="toast" class="toast-box"></div>
 
     <script>
+        // Strictly use sessionStorage to prevent credential persistence across browser reboots
         function getAdminKey() {
-            return sessionStorage.getItem('documind_admin_key') || localStorage.getItem('documind_admin_key') || '';
+            return sessionStorage.getItem('askpdf_admin_key') || '';
         }
 
         function saveAdminKey() {
             const val = document.getElementById('admin-key-input').value.trim();
             if (!val) {
-                showToast("Please enter a valid key.");
+                showToast("Please enter a valid key.", true);
                 return;
             }
-            sessionStorage.setItem('documind_admin_key', val);
+            sessionStorage.setItem('askpdf_admin_key', val);
             showToast("Admin key saved to session.");
             loadDocuments();
         }
 
-        // Initialize key input if present
+        // Initialize key input if present in session
         const savedKey = getAdminKey();
         if (savedKey) {
             document.getElementById('admin-key-input').value = savedKey;
@@ -429,9 +433,29 @@
             setTimeout(() => { toast.style.display = 'none'; }, 3500);
         }
 
+        // Defensive response parsing helper to avoid SyntaxError on HTML proxy responses
+        async function parseApiResponse(res) {
+            const contentType = res.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+                try {
+                    return await res.json();
+                } catch (e) {
+                    return { detail: "Failed to parse JSON response." };
+                }
+            } else {
+                const text = await res.text();
+                return { detail: text || `HTTP ${res.status} ${res.statusText}` };
+            }
+        }
+
         async function loadDocuments() {
             const tbody = document.getElementById('docs-tbody');
             const key = getAdminKey();
+
+            if (!key) {
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--text-muted);">Please enter your Admin Authorization Key above to view and manage documents.</td></tr>`;
+                return;
+            }
 
             try {
                 const res = await fetch('/admin/list-pdfs', {
@@ -439,26 +463,33 @@
                 });
 
                 if (res.status === 403) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="empty-state" style="color:#f87171;">Authorization required. Please enter your valid Admin Key above.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:#f87171;">Authorization failed: Invalid Admin Key. Please check the key entered above.</td></tr>`;
                     return;
                 }
 
+                if (res.status === 503) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:#f87171;">Admin operations are currently disabled: SUPER_USER_KEY is not configured in the server environment.</td></tr>`;
+                    return;
+                }
+
+                const data = await parseApiResponse(res);
                 if (!res.ok) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Failed to load documents.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load documents: ${escapeHtml(data.detail || res.statusText)}</td></tr>`;
                     return;
                 }
 
-                const data = await res.json();
                 const list = data.pdfs || [];
-
                 if (list.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">No PDF documents indexed yet. Upload one above.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No PDF documents indexed yet. Upload one above.</td></tr>`;
                     return;
                 }
 
                 tbody.innerHTML = list.map(item => `
                     <tr>
+                        <td style="color:var(--primary); font-weight:700;">#${item.upload_order || 1}</td>
                         <td style="font-weight:600;">${escapeHtml(item.filename)}</td>
+                        <td>${item.pages || 1}</td>
+                        <td style="color:var(--text-muted);">${item.chunks || 0}</td>
                         <td style="color:var(--text-muted);">${item.size_kb} KB</td>
                         <td style="text-align:right;">
                             <button class="btn btn-danger" onclick="deleteDocument('${escapeJs(item.filename)}')">
@@ -468,7 +499,7 @@
                     </tr>
                 `).join('');
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Error connecting to server.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Error connecting to server. Please check your backend connection.</td></tr>`;
             }
         }
 
@@ -484,7 +515,7 @@
 
             const statusBox = document.getElementById('upload-status');
             statusBox.style.display = 'block';
-            statusBox.innerHTML = `Uploading and indexing <strong>${escapeHtml(file.name)}</strong>...`;
+            statusBox.innerHTML = `Uploading, verifying, and indexing <strong>${escapeHtml(file.name)}</strong>...`;
 
             const formData = new FormData();
             formData.append('file', file);
@@ -497,7 +528,7 @@
                     body: formData
                 });
 
-                const data = await res.json();
+                const data = await parseApiResponse(res);
                 if (res.ok) {
                     statusBox.innerHTML = `<span style="color:#34d399;">✓ ${escapeHtml(data.message)}</span>`;
                     showToast("Uploaded and indexed!");
@@ -507,12 +538,12 @@
                     showToast(data.detail || "Upload failed", true);
                 }
             } catch (err) {
-                statusBox.innerHTML = `<span style="color:#ef4444;">✗ Network connection error during upload.</span>`;
+                statusBox.innerHTML = `<span style="color:#ef4444;">✗ Network error during upload. Check server connection.</span>`;
             }
         }
 
         async function deleteDocument(filename) {
-            if (!confirm(`Are you sure you want to delete '${filename}'? This will remove its vector embeddings.`)) {
+            if (!confirm(`Are you sure you want to delete '${filename}'? This will remove the file and all associated vector embeddings.`)) {
                 return;
             }
 
@@ -523,7 +554,7 @@
                     headers: { 'X-Admin-Key': key }
                 });
 
-                const data = await res.json();
+                const data = await parseApiResponse(res);
                 if (res.ok) {
                     showToast(data.message || "Document deleted.");
                     loadDocuments();
@@ -568,5 +599,8 @@
         // Load initially
         loadDocuments();
     </script>
+    <footer style="text-align: center; padding: 2rem 1.5rem; font-size: 0.8rem; color: var(--text-sub); border-top: 1px solid rgba(31, 41, 61, 0.4); margin-top: auto;">
+        AskPDF &copy; 2026 &mdash; <strong>Your documents. Your answers.</strong> Document Management Portal.
+    </footer>
 </body>
 </html>

@@ -1,145 +1,35 @@
 import os
 import sys
-import yaml
 import logging
-import functools
 from typing import List, Dict, Any, Tuple, Optional
-import gc
 import httpx
-import pypdf
 from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_ollama import OllamaLLM
-from langchain_core.prompts import PromptTemplate
-from langchain_core.language_models.llms import LLM
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+from core.config import load_config
+from core.doc_registry import registry, DocumentRegistry
+from core.pdf_processor import (
+    extract_pdf_documents as _extract_pdf_docs,
+    detect_printed_page_number,
+    is_table_of_contents_page,
+    extract_section_heading
+)
+from core.vector_store import (
+    get_embedding_function,
+    build_or_load_vectorstore,
+    CHROMA_COLLECTION_NAME
+)
+from core.retrieval import (
+    QueryIntent,
+    classify_query_intent,
+    RetrievalEngine
+)
+from core.generation import (
+    OpenAILikeLLM,
+    GenerationEngine
+)
+
 logger = logging.getLogger("documind.engine")
-
-
-class OpenAILikeLLM(LLM):
-    """Universal OpenAI-compatible chat completions wrapper (Groq, Together, OpenRouter, vLLM, OpenAI)."""
-    base_url: str = "https://api.openai.com/v1"
-    api_key: str = ""
-    model: str = "llama-3.3-70b-versatile"
-    temperature: float = 0.1
-    timeout_sec: float = 60.0
-
-    @property
-    def _llm_type(self) -> str:
-        return "openai_compatible"
-
-    def _call(self, prompt: str, stop: Optional[List[str]] = None, **kwargs: Any) -> str:
-        clean_base = self.base_url.strip().rstrip("/")
-        if clean_base.endswith("/chat/completions"):
-            url = clean_base
-        else:
-            url = f"{clean_base}/chat/completions"
-
-        headers = {
-            "Content-Type": "application/json"
-        }
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key.strip()}"
-
-        candidate_models = [self.model]
-        if "groq.com" in clean_base:
-            for fallback in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-20b"]:
-                if fallback not in candidate_models:
-                    candidate_models.append(fallback)
-
-        last_error = None
-        for candidate in candidate_models:
-            payload = {
-                "model": candidate,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": self.temperature
-            }
-            try:
-                with httpx.Client(timeout=self.timeout_sec) as client:
-                    res = client.post(url, json=payload, headers=headers)
-                    if res.status_code == 200:
-                        data = res.json()
-                        return data["choices"][0]["message"]["content"]
-
-                    err_text = res.text
-                    try:
-                        err_json = res.json()
-                        if "error" in err_json and "message" in err_json["error"]:
-                            err_text = err_json["error"]["message"]
-                    except Exception:
-                        pass
-
-                    last_error = f"HTTP {res.status_code} ({err_text})"
-                    logger.warning(f"Inference attempt with model '{candidate}' returned {last_error}")
-
-                    if res.status_code == 404 and candidate != candidate_models[-1]:
-                        next_idx = candidate_models.index(candidate) + 1
-                        logger.info(f"Retrying inference with next model '{candidate_models[next_idx]}'...")
-                        continue
-                    break
-            except Exception as e:
-                logger.error(f"Inference connection error calling {url} (model {candidate}): {e}")
-                last_error = str(e)
-                break
-
-        raise RuntimeError(f"Hosted LLM error: {last_error}")
-
-
-def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
-    """Loads configuration with defaults and environment variable overrides."""
-    config: Dict[str, Any] = {
-        "llm_provider": "ollama",
-        "llm_model": "llama3",
-        "llm_base_url": "http://localhost:11434",
-        "llm_api_key": "",
-        "embedding_model": "BAAI/bge-small-en-v1.5",
-        "ollama_base_url": "http://localhost:11434",
-        "pdf_dir": "./data/",
-        "chunk_size": 500,
-        "chunk_overlap": 100,
-        "persist_dir": "./db",
-        "history_length": 5,
-        "use_gpu": False,
-        "max_upload_size_mb": 20,
-        "ollama_timeout_seconds": 60
-    }
-
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                loaded = yaml.safe_load(f)
-                if loaded and isinstance(loaded, dict):
-                    config.update(loaded)
-        except Exception as e:
-            logger.warning(f"Error loading {config_path}: {e}. Utilizing fallback defaults.")
-
-    # Environment variable overrides
-    if os.getenv("LLM_PROVIDER"):
-        config["llm_provider"] = os.getenv("LLM_PROVIDER")
-    if os.getenv("LLM_MODEL"):
-        config["llm_model"] = os.getenv("LLM_MODEL")
-    if os.getenv("LLM_BASE_URL"):
-        config["llm_base_url"] = os.getenv("LLM_BASE_URL")
-    if os.getenv("LLM_API_KEY"):
-        config["llm_api_key"] = os.getenv("LLM_API_KEY")
-    if os.getenv("EMBEDDING_MODEL"):
-        config["embedding_model"] = os.getenv("EMBEDDING_MODEL")
-    if os.getenv("OLLAMA_BASE_URL"):
-        config["ollama_base_url"] = os.getenv("OLLAMA_BASE_URL")
-    if os.getenv("PDF_DIR"):
-        config["pdf_dir"] = os.getenv("PDF_DIR")
-    if os.getenv("PERSIST_DIR"):
-        config["persist_dir"] = os.getenv("PERSIST_DIR")
-    if os.getenv("MAX_UPLOAD_SIZE_MB"):
-        try:
-            config["max_upload_size_mb"] = int(os.getenv("MAX_UPLOAD_SIZE_MB", "20"))
-        except ValueError:
-            pass
-
-    return config
 
 
 def check_ollama_status(ollama_url: str, timeout: float = 2.0) -> Tuple[bool, str]:
@@ -156,237 +46,147 @@ def check_ollama_status(ollama_url: str, timeout: float = 2.0) -> Tuple[bool, st
 
 def extract_pdf_documents(
     pdf_path: str,
-    chunk_size: int = 500,
-    chunk_overlap: int = 100
+    chunk_size: int = 600,
+    chunk_overlap: int = 120
 ) -> Tuple[List[Document], int, int]:
     """
-    Extracts text page-by-page from a PDF and segments it into metadata-tagged chunks.
-    Returns: (documents, total_pages, total_chars_extracted)
+    Backwards-compatible wrapper returning (documents, total_pages, total_chars).
+    Also updates document registry with printed pages and section headings.
     """
+    docs, pages, chars, printed_map, sections = _extract_pdf_docs(pdf_path, chunk_size, chunk_overlap)
     filename = os.path.basename(pdf_path)
-    logger.info(f"Extracting text from PDF: {filename}")
+    size_kb = round(os.path.getsize(pdf_path) / 1024, 1) if os.path.exists(pdf_path) else 0.0
 
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=["\n\n", "\n", " ", ""]
-    )
-    documents: List[Document] = []
+    if docs:
+        registry.register(
+            filename=filename,
+            pages=pages,
+            chunks=len(docs),
+            size_kb=size_kb,
+            printed_pages=printed_map,
+            sections=sections
+        )
 
-    try:
-        reader = pypdf.PdfReader(pdf_path)
-    except Exception as e:
-        logger.error(f"Failed to parse PDF structure of '{filename}': {e}")
-        return [], 0, 0
-
-    num_pages = len(reader.pages)
-    if num_pages == 0:
-        logger.warning(f"PDF '{filename}' contains 0 pages.")
-        return [], 0, 0
-
-    total_chars = 0
-    for page_idx, page in enumerate(reader.pages):
-        page_num = page_idx + 1
-        try:
-            page_text = page.extract_text() or ""
-        except Exception as e:
-            logger.warning(f"Failed to extract text from page {page_num} of '{filename}': {e}")
-            page_text = ""
-
-        page_text = page_text.strip()
-        total_chars += len(page_text)
-        if not page_text:
-            continue
-
-        chunks = text_splitter.split_text(page_text)
-        for chunk in chunks:
-            chunk_clean = chunk.strip()
-            if chunk_clean:
-                documents.append(
-                    Document(
-                        page_content=chunk_clean,
-                        metadata={"source": filename, "page": page_num}
-                    )
-                )
-
-    logger.info(
-        f"Extracted {len(documents)} chunks ({total_chars} chars) across {num_pages} pages from '{filename}'."
-    )
-    return documents, num_pages, total_chars
-
-
-@functools.lru_cache(maxsize=4)
-def get_embedding_function(model_name: str) -> HuggingFaceEmbeddings:
-    """Initializes and caches the local HuggingFace embedding model with memory-safe batch size."""
-    logger.info(f"Loading embedding model: {model_name}")
-    return HuggingFaceEmbeddings(
-        model_name=model_name,
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True, "batch_size": 16}
-    )
-
-
-def build_or_load_vectorstore(
-    documents: List[Document],
-    embedding_function: HuggingFaceEmbeddings,
-    persist_dir: str
-) -> Optional[Chroma]:
-    """
-    Builds or updates a Chroma vectorstore in persist_dir.
-    Resets existing collection before inserting new documents to prevent stale chunks.
-    Batches chunk insertions to stay well within 512MB RAM constraints on cloud hosts.
-    """
-    os.makedirs(persist_dir, exist_ok=True)
-
-    vectorstore = Chroma(
-        persist_directory=persist_dir,
-        embedding_function=embedding_function
-    )
-
-    try:
-        vectorstore.delete_collection()
-    except Exception as e:
-        logger.debug(f"Collection reset notice: {e}")
-
-    # Recreate clean collection
-    vectorstore = Chroma(
-        persist_directory=persist_dir,
-        embedding_function=embedding_function
-    )
-
-    if documents:
-        logger.info(f"Indexing {len(documents)} document chunks into Chroma vectorstore at '{persist_dir}'...")
-        batch_size = 16
-        for i in range(0, len(documents), batch_size):
-            batch = documents[i:i + batch_size]
-            vectorstore.add_documents(batch)
-            gc.collect()
-        return vectorstore
-
-    logger.info("No documents provided; vectorstore initialized as empty.")
-    return None
+    return docs, pages, chars
 
 
 class RAGPipeline:
-    def __init__(self, vectorstore: Optional[Chroma], llm: Any, top_k: int = 4):
+    def __init__(self, vectorstore: Any, llm: Any, top_k: int = 5):
         self.vectorstore = vectorstore
         self.llm = llm
         self.top_k = top_k
-        self.qa_prompt = PromptTemplate(
-            template=(
-                "You are DocuMind AI, an intelligent, precise enterprise document assistant.\n"
-                "Use ONLY the following retrieved context passages to answer the user's question.\n"
-                "If the context does not contain enough information to answer, truthfully say:\n"
-                "'I cannot find the answer to this question in the provided documents.'\n"
-                "Do NOT make up facts or extrapolate beyond what is explicitly stated in the context.\n\n"
-                "Retrieved Context:\n"
-                "---------------------\n"
-                "{context}\n"
-                "---------------------\n\n"
-                "Question: {question}\n"
-                "Detailed Grounded Answer:"
-            ),
-            input_variables=["context", "question"]
-        )
+        self.registry = registry
+        self.retrieval_engine = RetrievalEngine(vectorstore=vectorstore, doc_registry=self.registry)
+        self.generation_engine = GenerationEngine(llm=llm)
 
-    def answer_query(self, query: str) -> Dict[str, Any]:
-        """Performs similarity retrieval, formats strict context, and invokes the LLM."""
+    def answer_query(
+        self,
+        query: str,
+        session_selected_doc: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Executes complete RAG workflow:
+        1. Classifies query intent.
+        2. Resolves document scope (ordinal, name, active session, or all).
+        3. Checks if user document selection is required.
+        4. Retrieves relevant chunks (with anti-TOC filtering).
+        5. Generates grounded answer with physical and printed page citations.
+        """
         if not self.vectorstore:
             return {
-                "answer": "No documents are currently indexed. Please upload a PDF in the Admin Panel to begin.",
+                "answer": "No documents are currently indexed in DocuMind AI. Please upload a PDF in the Document Admin panel to begin.",
                 "sources": []
             }
 
-        try:
-            docs = self.vectorstore.similarity_search(query, k=self.top_k)
-        except Exception as e:
-            logger.error(f"Vector search failed: {e}", exc_info=True)
+        all_docs = self.registry.get_all()
+
+        # 1. Classify query intent
+        intent = classify_query_intent(query)
+        logger.info(f"Classified query intent: {intent.value} for query: '{query}'")
+
+        # 2. Resolve document scope
+        target_doc, is_multi_doc, is_ambiguous = self.retrieval_engine.resolve_document_scope(
+            query=query,
+            session_selected_doc=session_selected_doc
+        )
+
+        # 3. Handle ambiguous document scope when multiple documents exist
+        if is_ambiguous and len(all_docs) > 1 and not session_selected_doc:
+            doc_options = [
+                {
+                    "document_id": d["document_id"],
+                    "filename": d["filename"],
+                    "display_name": f"{d['upload_order']}. {d['display_name']} ({d['pages']} pages)",
+                    "upload_order": d["upload_order"]
+                }
+                for d in all_docs
+            ]
+            doc_options.append({
+                "document_id": "all",
+                "filename": "all",
+                "display_name": "All Indexed Documents (Cross-Document Search)",
+                "upload_order": 999
+            })
+
             return {
-                "answer": "A vector search error occurred while retrieving document passages.",
+                "needs_document_selection": True,
+                "message": (
+                    f"You have {len(all_docs)} documents indexed. Please select which document you would "
+                    "like to inquire about, or choose 'All Documents':"
+                ),
+                "options": doc_options,
+                "answer": "",
                 "sources": []
             }
 
-        if not docs:
+        # If ordinal was resolved, log confirmation
+        if target_doc:
+            logger.info(f"Scoped query to document '{target_doc['filename']}' (upload order: {target_doc.get('upload_order')}).")
+
+        # 4. Retrieve chunks
+        context_chunks = self.retrieval_engine.retrieve_relevant_chunks(
+            query=query,
+            target_doc=target_doc,
+            intent=intent,
+            top_k=self.top_k
+        )
+
+        if not context_chunks:
+            doc_scope_str = f" in '{target_doc['filename']}'" if target_doc else ""
             return {
-                "answer": "I could not find any relevant passages in the indexed documents to answer your question.",
+                "answer": f"I could not find relevant information{doc_scope_str} to answer your question.",
                 "sources": []
             }
 
-        context_parts = []
-        sources = []
-        seen_citations = set()
+        # 5. Generate grounded response with physical & printed citations
+        result = self.generation_engine.generate_response(
+            query=query,
+            context_docs=context_chunks,
+            intent=intent
+        )
 
-        for doc in docs:
-            source = doc.metadata.get("source", "Unknown Document")
-            page = doc.metadata.get("page", 1)
-            content = doc.page_content.strip()
+        # Attach active document resolution to response metadata
+        if target_doc:
+            result["active_document"] = target_doc["filename"]
+            result["active_document_id"] = target_doc["document_id"]
 
-            context_parts.append(f"[Document: {source}, Page: {page}]\n{content}")
-
-            citation_key = (source, page, content[:80])
-            if citation_key not in seen_citations:
-                seen_citations.add(citation_key)
-                sources.append({
-                    "source": source,
-                    "page": page,
-                    "snippet": content
-                })
-
-        formatted_context = "\n\n".join(context_parts)
-        prompt = self.qa_prompt.format(context=formatted_context, question=query)
-
-        try:
-            response = self.llm.invoke(prompt)
-            answer_text = response.strip() if isinstance(response, str) else str(response).strip()
-        except Exception as e:
-            logger.error(f"LLM generation failed: {e}")
-            err_msg = str(e)
-            err_lower = err_msg.lower()
-            if "connection refused" in err_lower or "connect" in err_lower:
-                return {
-                    "answer": "Unable to connect to model service. Please verify your configured endpoint and credentials.",
-                    "sources": sources
-                }
-            elif "timed out" in err_lower or "timeout" in err_lower:
-                return {
-                    "answer": "The language model timed out while processing your request. Please try again or query a shorter passage.",
-                    "sources": sources
-                }
-            elif "401" in err_msg or "invalid api key" in err_lower:
-                return {
-                    "answer": "Authentication failed with the LLM provider (Invalid API Key). Please verify that your LLM_API_KEY environment variable is configured correctly in Render.",
-                    "sources": sources
-                }
-            elif "404" in err_msg or "model_not_found" in err_lower:
-                return {
-                    "answer": f"Configured model was not found on the hosted inference provider ({err_msg}). Please set LLM_MODEL in Render environment settings to an active model such as 'llama-3.3-70b-versatile'.",
-                    "sources": sources
-                }
-            return {
-                "answer": f"Language model error: {err_msg}",
-                "sources": sources
-            }
-
-        return {
-            "answer": answer_text,
-            "sources": sources
-        }
+        return result
 
 
 def initialize_qa_engine(config_path: str = "config.yaml") -> Tuple[Optional[RAGPipeline], Dict[str, Any]]:
     """
-    Initializes embeddings, scans pdf_dir, builds the vectorstore, and configures RAGPipeline.
-    Supports local Ollama and hosted OpenAI-compatible providers (Groq, Together, OpenRouter, etc.).
+    Scans PDF directory, indexes all documents, configures registry, and builds RAGPipeline.
     """
     config = load_config(config_path)
     pdf_dir = config["pdf_dir"]
     persist_dir = config["persist_dir"]
-    chunk_size = config.get("chunk_size", 500)
-    chunk_overlap = config.get("chunk_overlap", 100)
+    chunk_size = config.get("chunk_size", 600)
+    chunk_overlap = config.get("chunk_overlap", 120)
     provider = config.get("llm_provider", "ollama").lower()
     model_name = config.get("llm_model", "llama3")
     embedding_model = config.get("embedding_model", "BAAI/bge-small-en-v1.5")
-    timeout_sec = float(config.get("ollama_timeout_seconds", 60))
+    timeout_sec = float(config.get("ollama_timeout_seconds", 90))
+    num_ctx = int(config.get("ollama_num_ctx", 4096))
 
     os.makedirs(pdf_dir, exist_ok=True)
     os.makedirs(persist_dir, exist_ok=True)
@@ -403,26 +203,50 @@ def initialize_qa_engine(config_path: str = "config.yaml") -> Tuple[Optional[RAG
     vectorstore = build_or_load_vectorstore(all_documents, embedding_fn, persist_dir)
 
     # Initialize appropriate LLM provider
+    ollama_url = config.get("ollama_base_url", "http://localhost:11434")
     if provider in ["openai", "groq", "together", "openrouter", "openai_compatible"]:
         base_url = config.get("llm_base_url") or os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
         api_key = config.get("llm_api_key") or os.getenv("LLM_API_KEY", "")
-        logger.info(f"Configuring hosted inference client ({provider}) at {base_url} (model: '{model_name}')...")
-        llm = OpenAILikeLLM(
-            base_url=base_url,
-            api_key=api_key,
-            model=model_name,
-            temperature=0.1,
-            timeout_sec=timeout_sec
-        )
+        if not api_key:
+            is_ollama_up, _ = check_ollama_status(ollama_url, timeout=1.0)
+            if is_ollama_up:
+                logger.info(f"Using active local Ollama on MacBook ({ollama_url})...")
+                provider = "ollama"
+                model_name = "llama3"
+                llm = OllamaLLM(
+                    base_url=ollama_url,
+                    model=model_name,
+                    temperature=0.1,
+                    num_ctx=num_ctx,
+                    timeout=timeout_sec
+                )
+            else:
+                logger.info(f"Configuring hosted inference client at {base_url}...")
+                llm = OpenAILikeLLM(
+                    base_url=base_url,
+                    api_key="",
+                    model=model_name,
+                    temperature=0.1,
+                    timeout_sec=timeout_sec
+                )
+        else:
+            logger.info(f"Configuring hosted inference client at {base_url} (model: {model_name})...")
+            llm = OpenAILikeLLM(
+                base_url=base_url,
+                api_key=api_key,
+                model=model_name,
+                temperature=0.1,
+                timeout_sec=timeout_sec
+            )
     else:
-        ollama_url = config.get("ollama_base_url", "http://localhost:11434")
-        logger.info(f"Configuring Ollama client at {ollama_url} (model: '{model_name}', timeout: {timeout_sec}s)...")
+        logger.info(f"Configuring Ollama client at {ollama_url} (model: '{model_name}', num_ctx: {num_ctx})...")
         llm = OllamaLLM(
             base_url=ollama_url,
             model=model_name,
             temperature=0.1,
+            num_ctx=num_ctx,
             timeout=timeout_sec
         )
 
-    pipeline = RAGPipeline(vectorstore=vectorstore, llm=llm) if vectorstore else None
+    pipeline = RAGPipeline(vectorstore=vectorstore, llm=llm, top_k=5) if vectorstore else None
     return pipeline, config

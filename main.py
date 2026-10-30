@@ -2,9 +2,12 @@ import os
 import sys
 import shutil
 import re
+import time
 import logging
 import asyncio
+import secrets
 import gc
+from collections import defaultdict
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
@@ -14,26 +17,56 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from qa_engine import initialize_qa_engine, load_config, check_ollama_status, extract_pdf_documents, RAGPipeline
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+from core.config import load_config
+from core.doc_registry import registry
+from qa_engine import (
+    initialize_qa_engine,
+    check_ollama_status,
+    extract_pdf_documents,
+    RAGPipeline
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-logger = logging.getLogger("documind.server")
+logger = logging.getLogger("askpdf.server")
 
 # Load configuration
 config = load_config()
 PDF_DIR = config["pdf_dir"]
 PERSIST_DIR = config["persist_dir"]
 MAX_UPLOAD_SIZE_BYTES = int(config.get("max_upload_size_mb", 20)) * 1024 * 1024
+RATE_LIMIT_PER_MINUTE = int(config.get("rate_limit_per_minute", 30))
 
-# Environment variable for admin authorization
-SUPER_USER_KEY = os.getenv("SUPER_USER_KEY")
-if not SUPER_USER_KEY:
-    SUPER_USER_KEY = "documind-dev-supersecretkey-change-in-prod"
-    logger.warning("No SUPER_USER_KEY specified in environment. Using development-only fallback key. Set SUPER_USER_KEY in production.")
+# Environment variable for admin authorization with fail-closed security
+RAW_SUPER_USER_KEY = os.getenv("SUPER_USER_KEY", "").strip()
+INSECURE_PLACEHOLDERS = {
+    "documind-dev-supersecretkey-change-in-prod",
+    "YOUR_SECRET_KEY",
+    "changeme",
+    "admin",
+    ""
+}
+SUPER_USER_KEY: Optional[str] = None
+if RAW_SUPER_USER_KEY and RAW_SUPER_USER_KEY not in INSECURE_PLACEHOLDERS:
+    SUPER_USER_KEY = RAW_SUPER_USER_KEY
+    logger.info("Admin authentication enabled with secure SUPER_USER_KEY.")
+else:
+    logger.warning("No secure SUPER_USER_KEY configured. Admin endpoints will fail closed.")
 
 # Global pipeline instance protected by an async lock
 rag_pipeline: Optional[RAGPipeline] = None
 engine_lock = asyncio.Lock()
+
+# In-memory sliding window rate limiter: IP -> list of request timestamps
+rate_limit_records: Dict[str, List[float]] = defaultdict(list)
+
+# In-memory session tracking for multi-turn conversation document context
+session_store: Dict[str, Dict[str, Any]] = defaultdict(dict)
 
 
 def sanitize_filename(filename: str) -> str:
@@ -51,25 +84,49 @@ def verify_admin_key(
 ) -> bool:
     """
     Validates super user key against header or form payload.
-    URL query parameter keys are strictly rejected to prevent credentials from being logged in URLs.
+    Uses constant-time comparison (secrets.compare_digest) to prevent timing attacks.
+    URL query parameter keys are strictly rejected.
     """
+    if not SUPER_USER_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin operations are disabled: SUPER_USER_KEY is not configured in the server environment."
+        )
+
     provided_key = header_key or form_key
-    if not provided_key or provided_key != SUPER_USER_KEY:
+    if not provided_key:
         return False
-    return True
+
+    return secrets.compare_digest(provided_key.strip(), SUPER_USER_KEY)
+
+
+def check_rate_limit(client_ip: str):
+    """Enforces per-IP sliding window rate limiting."""
+    now = time.time()
+    window_start = now - 60.0
+    timestamps = [t for t in rate_limit_records[client_ip] if t > window_start]
+    timestamps.append(now)
+    rate_limit_records[client_ip] = timestamps
+
+    if len(timestamps) > RATE_LIMIT_PER_MINUTE:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded. Maximum {RATE_LIMIT_PER_MINUTE} requests per minute allowed."
+        )
 
 
 async def _reinitialize_qa_engine_unlocked():
     """Internal helper to reindex all PDFs into PERSIST_DIR without acquiring engine_lock."""
     global rag_pipeline
-    logger.info("Reinitializing DocuMind AI QA Engine...")
+    logger.info("Reinitializing AskPDF QA Engine...")
     os.makedirs(PDF_DIR, exist_ok=True)
     os.makedirs(PERSIST_DIR, exist_ok=True)
+    registry.reconcile_with_disk(PDF_DIR)
 
     try:
         pipeline, _ = await asyncio.to_thread(initialize_qa_engine, "config.yaml")
         rag_pipeline = pipeline
-        logger.info("DocuMind AI QA Engine initialized successfully.")
+        logger.info("AskPDF QA Engine initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to reinitialize QA engine: {e}", exc_info=True)
         rag_pipeline = None
@@ -85,14 +142,15 @@ async def reinitialize_qa_engine():
 async def lifespan(app: FastAPI):
     os.makedirs(PDF_DIR, exist_ok=True)
     os.makedirs(PERSIST_DIR, exist_ok=True)
+    registry.reconcile_with_disk(PDF_DIR)
     await reinitialize_qa_engine()
     yield
 
 
 app = FastAPI(
-    title="DocuMind AI API",
-    description="Enterprise Document Intelligence & Grounded Question Answering Engine",
-    version="1.0.0",
+    title="AskPDF API",
+    description="Your documents. Your answers. — AI-powered document intelligence and grounded question answering platform.",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -110,44 +168,84 @@ templates = Jinja2Templates(directory=".")
 
 class Question(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000, description="Question text cannot be empty.")
+    document_id: Optional[str] = Field(None, description="Optional target document ID or 'all'")
+    session_id: Optional[str] = Field(None, description="Client session ID for multi-turn conversational context")
 
 
 @app.get("/health")
 @app.get("/healthz")
 async def health_check():
-    """Health check endpoint for Docker, Render, and external monitoring."""
+    """Health check endpoint for local monitoring, Docker, and ngrok."""
     pdf_count = len([f for f in os.listdir(PDF_DIR) if f.lower().endswith(".pdf")]) if os.path.exists(PDF_DIR) else 0
     provider = config.get("llm_provider", "ollama").lower()
+    model = config.get("llm_model", "llama3")
 
     model_online = True
-    model_msg = f"Provider '{provider}' configured."
+    model_msg = f"Provider '{provider}' active."
+
     if provider == "ollama":
         ollama_url = config.get("ollama_base_url", "http://localhost:11434")
         model_online, model_msg = await asyncio.to_thread(check_ollama_status, ollama_url)
+    else:
+        api_key = config.get("llm_api_key") or os.getenv("LLM_API_KEY", "")
+        if not api_key:
+            model_online = False
+            model_msg = "No LLM_API_KEY configured for hosted inference."
+        else:
+            model_online = True
+            model_msg = f"Hosted provider '{provider}' ready (model: {model})."
 
     return {
         "status": "healthy",
-        "app": "DocuMind AI",
+        "app": "AskPDF",
+        "tagline": "Your documents. Your answers.",
+        "version": "2.0.0",
         "engine_ready": rag_pipeline is not None,
         "indexed_pdfs": pdf_count,
         "provider": provider,
         "model_online": model_online,
         "ollama_online": model_online,
         "model_status": model_msg,
-        "model": config.get("llm_model")
+        "model": model,
+        "admin_auth_configured": SUPER_USER_KEY is not None
     }
 
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """Serves the main DocuMind AI question answering UI."""
+    """Serves the main AskPDF question answering UI."""
     return templates.TemplateResponse(request=request, name="index.html")
 
 
+@app.get("/documents")
+async def list_available_documents():
+    """Returns public list of indexed documents with metadata for the UI document selector."""
+    all_docs = registry.get_all()
+    return {
+        "documents": [
+            {
+                "document_id": d["document_id"],
+                "filename": d["filename"],
+                "display_name": d["display_name"],
+                "upload_order": d["upload_order"],
+                "pages": d["pages"],
+                "chunks": d["chunks"],
+                "size_kb": d["size_kb"]
+            }
+            for d in all_docs
+        ],
+        "total": len(all_docs)
+    }
+
+
 @app.post("/ask")
-async def ask_question(question: Question):
-    """Processes user queries against indexed documents and returns answers with citations."""
+async def ask_question(question: Question, request: Request):
+    """Processes user queries against indexed documents with session context and citations."""
     global rag_pipeline
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    check_rate_limit(client_ip)
+
     clean_query = question.query.strip()
     if not clean_query:
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
@@ -156,16 +254,35 @@ async def ask_question(question: Question):
         pdf_files = [f for f in os.listdir(PDF_DIR) if f.lower().endswith(".pdf")] if os.path.exists(PDF_DIR) else []
         if not pdf_files:
             return {
-                "answer": "No documents are currently indexed in DocuMind AI. Please upload a PDF in the Document Admin panel to begin.",
+                "answer": "No documents are currently indexed in AskPDF. Please upload a PDF in the Document Management panel to begin.",
                 "sources": []
             }
         raise HTTPException(
             status_code=503,
-            detail="DocuMind AI engine is initializing or re-indexing. Please retry in a few moments."
+            detail="AskPDF engine is initializing or re-indexing. Please retry in a few moments."
         )
 
+    # Resolve session document context
+    session_id = question.session_id or "default_session"
+    active_session_doc = question.document_id
+
+    # If document_id was explicitly passed (e.g. from UI selector), update session
+    if active_session_doc:
+        session_store[session_id]["selected_document"] = active_session_doc
+    else:
+        active_session_doc = session_store[session_id].get("selected_document")
+
     try:
-        result = await asyncio.to_thread(rag_pipeline.answer_query, clean_query)
+        result = await asyncio.to_thread(
+            rag_pipeline.answer_query,
+            clean_query,
+            session_selected_doc=active_session_doc
+        )
+
+        # If answer was scoped to a specific document, persist into session
+        if result.get("active_document"):
+            session_store[session_id]["selected_document"] = result["active_document"]
+
         return result
     except Exception as e:
         logger.error(f"Error answering question: {e}", exc_info=True)
@@ -241,6 +358,10 @@ async def upload_pdf(
     # Incremental indexing with memory-safe batches of 16
     async with engine_lock:
         if rag_pipeline and rag_pipeline.vectorstore and docs:
+            try:
+                await asyncio.to_thread(rag_pipeline.vectorstore.delete, where={"source": safe_name})
+            except Exception:
+                pass
             batch_size = 16
             for i in range(0, len(docs), batch_size):
                 await asyncio.to_thread(rag_pipeline.vectorstore.add_documents, docs[i:i + batch_size])
@@ -272,12 +393,20 @@ async def list_pdfs(
         )
 
     os.makedirs(PDF_DIR, exist_ok=True)
+    registry.reconcile_with_disk(PDF_DIR)
+    all_registered = registry.get_all()
+
     pdf_list = []
-    for f in sorted(os.listdir(PDF_DIR)):
-        if f.lower().endswith(".pdf"):
-            full_path = os.path.join(PDF_DIR, f)
-            size_kb = round(os.path.getsize(full_path) / 1024, 1)
-            pdf_list.append({"filename": f, "size_kb": size_kb})
+    for d in all_registered:
+        pdf_list.append({
+            "document_id": d["document_id"],
+            "filename": d["filename"],
+            "display_name": d["display_name"],
+            "upload_order": d["upload_order"],
+            "pages": d["pages"],
+            "chunks": d["chunks"],
+            "size_kb": d["size_kb"]
+        })
 
     return {"pdfs": pdf_list, "total": len(pdf_list)}
 
@@ -301,7 +430,9 @@ async def delete_pdf(
 
     try:
         os.remove(path)
-        logger.info(f"Deleted document from storage: {safe_name}")
+        registry.remove(safe_name)
+        logger.info(f"Deleted document from storage and registry: {safe_name}")
+
         async with engine_lock:
             if rag_pipeline and rag_pipeline.vectorstore:
                 try:
@@ -310,6 +441,7 @@ async def delete_pdf(
                     await _reinitialize_qa_engine_unlocked()
             else:
                 await _reinitialize_qa_engine_unlocked()
+
         return JSONResponse(content={"message": f"'{safe_name}' deleted and vector index updated."})
     except Exception as e:
         logger.error(f"Failed to delete document '{safe_name}': {e}", exc_info=True)

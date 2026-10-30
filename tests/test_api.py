@@ -11,7 +11,8 @@ def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["app"] == "DocuMind AI"
+    assert data["app"] == "AskPDF"
+    assert data["tagline"] == "Your documents. Your answers."
     assert "status" in data
     assert "indexed_pdfs" in data
     assert "ollama_online" in data
@@ -25,12 +26,13 @@ def test_health_check():
 def test_html_pages():
     res_home = client.get("/")
     assert res_home.status_code == 200
-    assert "DocuMind AI" in res_home.text
+    assert "AskPDF" in res_home.text
+    assert "Your documents. Your answers." in res_home.text
 
     res_admin = client.get("/admin")
     assert res_admin.status_code == 200
-    assert "DocuMind AI" in res_admin.text
-    assert "Admin Portal" in res_admin.text
+    assert "AskPDF" in res_admin.text
+    assert "Document Management" in res_admin.text
 
 
 def test_ask_empty_query():
@@ -157,3 +159,28 @@ def test_ask_when_pipeline_unavailable():
             res = client.post("/ask", json={"query": "Test query"})
             assert res.status_code == 200
             assert "No documents are currently indexed" in res.json()["answer"]
+
+
+def test_documents_endpoint():
+    res = client.get("/documents")
+    assert res.status_code == 200
+    data = res.json()
+    assert "documents" in data
+    assert "total" in data
+    assert isinstance(data["documents"], list)
+
+
+def test_ask_with_session_and_document_id():
+    with patch("main.rag_pipeline") as mock_pipeline:
+        mock_pipeline.answer_query.return_value = {
+            "answer": "Answer for specific document.",
+            "sources": []
+        }
+        res = client.post("/ask", json={
+            "query": "Specific question",
+            "session_id": "test_session_123",
+            "document_id": "all"
+        })
+        assert res.status_code == 200
+        mock_pipeline.answer_query.assert_called_once()
+
