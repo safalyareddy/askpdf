@@ -55,6 +55,10 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
         config["embedding_model"] = os.getenv("EMBEDDING_MODEL")
     if os.getenv("OLLAMA_BASE_URL"):
         config["ollama_base_url"] = os.getenv("OLLAMA_BASE_URL")
+    storage_dir = os.getenv("STORAGE_DIR", "").strip()
+    if storage_dir:
+        config["pdf_dir"] = os.path.join(storage_dir, "data")
+        config["persist_dir"] = os.path.join(storage_dir, "db")
     if os.getenv("PDF_DIR"):
         config["pdf_dir"] = os.getenv("PDF_DIR")
     if os.getenv("PERSIST_DIR"):

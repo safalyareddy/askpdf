@@ -25,8 +25,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN chmod +x /app/entrypoint.sh
 
-# Ensure data and db directories exist
-RUN mkdir -p /app/data /app/db
+# Ensure data, db, and storage directories exist
+RUN mkdir -p /app/data /app/db /app/storage
 
 EXPOSE 8000
 

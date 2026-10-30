@@ -9,7 +9,12 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger("documind.registry")
 
 def get_registry_path() -> str:
-    persist_dir = os.getenv("PERSIST_DIR", "./db")
+    storage_dir = os.getenv("STORAGE_DIR", "").strip()
+    if storage_dir:
+        default_persist = os.path.join(storage_dir, "db")
+    else:
+        default_persist = "./db"
+    persist_dir = os.getenv("PERSIST_DIR", default_persist)
     if persist_dir.startswith("/app") and not os.path.exists("/app"):
         persist_dir = "./db"
     return os.path.join(persist_dir, "documents_registry.json")
