@@ -45,3 +45,4 @@ storage/
 backups/
 caddy_data/
 caddy_config/
+.agents/

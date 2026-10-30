@@ -1,17 +1,13 @@
 # AskPDF — Render Blueprint Specification
-# Production Docker Web Service with Persistent Storage Disk
+# Production Docker Web Service (Render Free Tier — ₹0/month)
 
 services:
   - type: web
-    name: askpdf-backend
+    name: documind-ai-ddt8
     runtime: docker
-    plan: starter
+    plan: free
     region: singapore
     healthCheckPath: /health
-    disk:
-      name: askpdf-storage
-      mountPath: /app/storage
-      sizeGB: 5
     envVars:
       - key: PORT
         value: "8000"
