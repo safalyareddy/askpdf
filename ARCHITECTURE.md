@@ -57,7 +57,9 @@ AskPDF is organized into nine cohesive logical layers:
                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           GENERATION LAYER                                  │
-│   • core/generation.py (Ollama llama3:latest with num_ctx=4096)             │
+│   • core/generation.py: Dual Engine Architecture                            │
+│     - Cloud Production: Groq Cloud (Llama 3.1 8B Instant) / OpenAI (GPT-4o)  │
+│     - Local Workstation: Ollama (llama3:latest with num_ctx=4096)           │
 │   • Specialized Prompts (QA, Abstract, Summarization, Comparison)           │
 │   • Balanced Grounding Policy (Answers with available context & notes gaps) │
 └───────────────────┬─────────────────────────────────────────────────────────┘

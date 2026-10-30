@@ -1,7 +1,7 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-LABEL maintainer="DocuMind AI"
-LABEL description="DocuMind AI — Grounded Document Intelligence Platform"
+LABEL maintainer="AskPDF"
+LABEL description="AskPDF — Your documents. Your answers."
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

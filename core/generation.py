@@ -14,7 +14,7 @@ logger = logging.getLogger("documind.generation")
 # Specialized System Prompts
 # =====================================================================
 
-QA_PROMPT_TEMPLATE = """You are DocuMind AI, an intelligent, precise enterprise document intelligence assistant.
+QA_PROMPT_TEMPLATE = """You are AskPDF (Your documents. Your answers.), an intelligent, precise document intelligence assistant.
 Answer the user's question accurately using ONLY the retrieved context passages below.
 If the context does not contain enough information to answer the question, state clearly what information is available and what is missing, rather than guessing.
 Provide a clear, well-structured response using Markdown formatting (headings, bullet points, and bold text).
@@ -28,7 +28,7 @@ User Question: {question}
 
 Detailed Grounded Answer:"""
 
-ABSTRACT_PROMPT_TEMPLATE = """You are DocuMind AI. The user is asking for the Abstract of the document.
+ABSTRACT_PROMPT_TEMPLATE = """You are AskPDF. The user is asking for the Abstract of the document.
 Your task is to present the ACTUAL CONTENT and full narrative of the Abstract from the retrieved passages below.
 DO NOT merely state where the abstract is located or what page number it is on. Provide the full text, problem statement, methodology, and solution described in the Abstract.
 
@@ -41,7 +41,7 @@ Question: {question}
 
 Full Abstract Content:"""
 
-SUMMARIZATION_PROMPT_TEMPLATE = """You are DocuMind AI. The user has requested a comprehensive summary of the document.
+SUMMARIZATION_PROMPT_TEMPLATE = """You are AskPDF. The user has requested a comprehensive summary of the document.
 Synthesize the provided passages across the entire document into an in-depth, professional summary.
 Format your answer with clear Markdown sections:
 ### 1. Executive Overview & Objectives
@@ -59,7 +59,7 @@ Document Summary Request: {question}
 
 Comprehensive Document Summary:"""
 
-COMPARISON_PROMPT_TEMPLATE = """You are DocuMind AI. The user has requested a comparative analysis between documents.
+COMPARISON_PROMPT_TEMPLATE = """You are AskPDF. The user has requested a comparative analysis between documents.
 Using ONLY the provided passages, compare and contrast the projects, methodologies, and findings.
 Structure your answer clearly:
 ### 1. Overview of Each Document
@@ -227,7 +227,23 @@ class GenerationEngine:
                 "sources": citations
             }
 
+        # Guardrail: If model explicitly refused to answer due to missing facts,
+        # do not attach irrelevant context passages as citations
+        refusal_phrases = [
+            "no information available",
+            "do not contain any information",
+            "not mentioned in the provided",
+            "not mentioned in the retrieved",
+            "cannot find any information",
+            "could not find any information",
+            "no relevant information",
+            "i cannot answer",
+            "unable to answer"
+        ]
+        is_refusal = any(p in answer_text.lower() for p in refusal_phrases)
+        final_citations = [] if is_refusal else citations
+
         return {
             "answer": answer_text,
-            "sources": citations
+            "sources": final_citations
         }

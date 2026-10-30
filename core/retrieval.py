@@ -35,7 +35,14 @@ def classify_query_intent(query: str) -> QueryIntent:
         return QueryIntent.SUMMARIZATION
 
     # Section extraction intent
-    if any(k in q_clean for k in ["implementation section", "limitations section", "methodology section", "architecture section", "user flow section"]):
+    section_patterns = [
+        r"\b(?:conclusion|concluding\s+remarks?)\b",
+        r"\b(?:methodology|system\s+architecture|architecture\s+design|architecture)\b",
+        r"\b(?:limitation|limitations|scope\s+and\s+limitations|future\s+work)\b",
+        r"\b(?:user\s+flow|prototype|prototyping|style\s+guide|information\s+architecture)\b",
+        r"\b(?:requirements?|functional\s+requirements?)\b"
+    ]
+    if any(re.search(pat, q_clean) for pat in section_patterns):
         return QueryIntent.SECTION_EXTRACTION
 
     return QueryIntent.FACTUAL_QA
@@ -260,6 +267,86 @@ class RetrievalEngine:
 
         return comparison_chunks
 
+    def retrieve_section_chunks(self, target_doc: Dict[str, Any], query: str, top_k: int = 5) -> List[Document]:
+        """
+        Directly targets section headings (e.g. Conclusion, Architecture, Methodology, User Flow)
+        and merges with semantic search for high-precision section extraction.
+        """
+        if not self.vectorstore:
+            return []
+
+        filename = target_doc["filename"]
+        q_lower = query.lower()
+
+        # Identify target section keywords
+        section_terms = []
+        if "conclusion" in q_lower or "concluding" in q_lower:
+            section_terms.append("conclusion")
+        if "architecture" in q_lower or "system design" in q_lower:
+            section_terms.extend(["architecture", "system design", "system architecture"])
+        if "methodology" in q_lower or "method" in q_lower:
+            section_terms.extend(["methodology", "architecture", "system", "implementation"])
+        if "limitation" in q_lower or "scope" in q_lower:
+            section_terms.extend(["limitation", "scope"])
+        if "prototype" in q_lower or "prototyping" in q_lower or "wireframe" in q_lower:
+            section_terms.extend(["prototype", "fidelity", "screen"])
+        if "user flow" in q_lower:
+            section_terms.extend(["user flow", "information architecture"])
+
+        matched_chunks: List[Document] = []
+        seen_snippets = set()
+
+        # 1. Direct match on section headings from document registry
+        target_sections = target_doc.get("sections", [])
+        matched_headings = []
+        for sec in target_sections:
+            sec_lower = sec.lower()
+            if any(term in sec_lower for term in section_terms):
+                matched_headings.append(sec)
+
+        coll = getattr(self.vectorstore, "_collection", None)
+        if coll and matched_headings:
+            try:
+                for h in matched_headings[:4]:
+                    res = coll.get(
+                        where={
+                            "$and": [
+                                {"source": {"$eq": filename}},
+                                {"section_heading": {"$eq": h}},
+                                {"is_toc": {"$eq": False}}
+                            ]
+                        }
+                    )
+                    if res and res.get("ids"):
+                        for i in range(len(res["ids"])):
+                            txt = res["documents"][i]
+                            k = txt[:100].lower()
+                            if k not in seen_snippets:
+                                seen_snippets.add(k)
+                                matched_chunks.append(Document(page_content=txt, metadata=res["metadatas"][i]))
+            except Exception as e:
+                logger.warning(f"Error querying section heading: {e}")
+
+        # 2. Similarity search targeted on section keywords with anti-TOC filtering
+        try:
+            sec_query = f"{' '.join(section_terms)} {filename}" if section_terms else query
+            sim_chunks = self.vectorstore.similarity_search(sec_query, k=top_k * 3, filter={"source": filename})
+            for c in sim_chunks:
+                meta = c.metadata or {}
+                txt = c.page_content.strip()
+                if meta.get("is_toc", False) or len(re.findall(r"\.{3,}", txt)) >= 2:
+                    continue
+                k = txt[:100].lower()
+                if k not in seen_snippets:
+                    seen_snippets.add(k)
+                    matched_chunks.append(c)
+        except Exception as e:
+            logger.warning(f"Error in section similarity search: {e}")
+
+        if matched_chunks:
+            return matched_chunks[:top_k]
+        return self.vectorstore.similarity_search(query, k=top_k, filter={"source": filename})
+
     def retrieve_relevant_chunks(
         self,
         query: str,
@@ -267,7 +354,7 @@ class RetrievalEngine:
         intent: QueryIntent = QueryIntent.FACTUAL_QA,
         top_k: int = 5
     ) -> List[Document]:
-        """General retrieval pipeline with query routing and anti-TOC filtering."""
+        """General retrieval pipeline with hybrid keyword reranking and anti-TOC filtering."""
         if not self.vectorstore:
             return []
 
@@ -278,6 +365,9 @@ class RetrievalEngine:
         if intent == QueryIntent.SUMMARIZATION and target_doc:
             return self.retrieve_summary_chunks(target_doc)
 
+        if intent == QueryIntent.SECTION_EXTRACTION and target_doc:
+            return self.retrieve_section_chunks(target_doc, query, top_k=top_k)
+
         if intent == QueryIntent.COMPARISON:
             return self.retrieve_comparison_chunks(query)
 
@@ -286,15 +376,15 @@ class RetrievalEngine:
 
         try:
             if filter_dict:
-                candidates = self.vectorstore.similarity_search(query, k=top_k * 2, filter=filter_dict)
+                candidates = self.vectorstore.similarity_search(query, k=top_k * 3, filter=filter_dict)
             else:
-                candidates = self.vectorstore.similarity_search(query, k=top_k * 2)
+                candidates = self.vectorstore.similarity_search(query, k=top_k * 3)
         except Exception as e:
             logger.warning(f"Similarity search error: {e}, attempting unfiltered fallback...")
-            candidates = self.vectorstore.similarity_search(query, k=top_k * 2)
+            candidates = self.vectorstore.similarity_search(query, k=top_k * 3)
 
         # Filter out Table of Contents and duplicate snippets
-        filtered: List[Document] = []
+        valid_candidates: List[Document] = []
         seen_snippets = set()
 
         for doc in candidates:
@@ -310,9 +400,34 @@ class RetrievalEngine:
             if snippet_key in seen_snippets:
                 continue
             seen_snippets.add(snippet_key)
+            valid_candidates.append(doc)
 
-            filtered.append(doc)
-            if len(filtered) >= top_k:
-                break
+        if not valid_candidates:
+            return candidates[:top_k]
 
-        return filtered if filtered else candidates[:top_k]
+        # Hybrid keyword reranking: score chunks by dense rank + lexical query overlap
+        stopwords = {"what", "is", "the", "in", "and", "or", "of", "to", "a", "an", "this", "that", "these", "those", "for", "with", "about", "are", "by", "from", "on"}
+        query_words = set(re.findall(r"\b[a-zA-Z0-9_-]{3,}\b", query.lower())) - stopwords
+
+        scored = []
+        for rank, doc in enumerate(valid_candidates):
+            content_lower = doc.page_content.lower()
+            meta = doc.metadata or {}
+            heading_lower = str(meta.get("section_heading", "")).lower()
+
+            # Calculate keyword match ratio
+            matched_words = sum(1 for w in query_words if w in content_lower)
+            lexical_ratio = (matched_words / len(query_words)) if query_words else 0.0
+
+            # Section heading bonus
+            heading_bonus = 0.4 if any(w in heading_lower for w in query_words) else 0.0
+
+            # Position decay from dense retrieval
+            dense_score = max(0.0, 1.0 - (rank * 0.04))
+
+            total_score = dense_score + (0.5 * lexical_ratio) + heading_bonus
+            scored.append((total_score, doc))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [doc for _, doc in scored[:top_k]]
+

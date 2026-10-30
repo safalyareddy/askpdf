@@ -403,6 +403,17 @@
     <div id="toast" class="toast-box"></div>
 
     <script>
+        function getApiBaseUrl() {
+            if (window.ASKPDF_API_URL && typeof window.ASKPDF_API_URL === 'string' && window.ASKPDF_API_URL.trim()) {
+                return window.ASKPDF_API_URL.trim().replace(/\/+$/, '');
+            }
+            const saved = localStorage.getItem('askpdf_backend_url');
+            if (saved && saved.trim()) {
+                return saved.trim().replace(/\/+$/, '');
+            }
+            return '';
+        }
+
         // Strictly use sessionStorage to prevent credential persistence across browser reboots
         function getAdminKey() {
             return sessionStorage.getItem('askpdf_admin_key') || '';
@@ -458,7 +469,7 @@
             }
 
             try {
-                const res = await fetch('/admin/list-pdfs', {
+                const res = await fetch(`${getApiBaseUrl()}/admin/list-pdfs`, {
                     headers: { 'X-Admin-Key': key }
                 });
 
@@ -522,7 +533,7 @@
             formData.append('super_user_key', key);
 
             try {
-                const res = await fetch('/admin/upload-pdf', {
+                const res = await fetch(`${getApiBaseUrl()}/admin/upload-pdf`, {
                     method: 'POST',
                     headers: { 'X-Admin-Key': key },
                     body: formData
@@ -549,7 +560,7 @@
 
             const key = getAdminKey();
             try {
-                const res = await fetch(`/admin/delete-pdf?filename=${encodeURIComponent(filename)}`, {
+                const res = await fetch(`${getApiBaseUrl()}/admin/delete-pdf?filename=${encodeURIComponent(filename)}`, {
                     method: 'DELETE',
                     headers: { 'X-Admin-Key': key }
                 });

@@ -76,8 +76,8 @@ If zero-downtime backup is required:
 
 1. **Clone Repository & Set Up Virtual Environment:**
    ```bash
-   git clone https://github.com/safalyareddy/documind-ai.git documind
-   cd documind
+   git clone https://github.com/safalyareddy/askpdf.git askpdf
+   cd askpdf
    python3.11 -m venv .venv
    source .venv/bin/activate
    pip install -r requirements.txt

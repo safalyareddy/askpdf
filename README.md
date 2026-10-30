@@ -3,173 +3,151 @@
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store%20v2.0-FF6F00?style=flat)](https://trychroma.com)
+[![Vercel](https://img.shields.io/badge/Vercel-Frontend%20Hosting-000000?style=flat&logo=vercel&logoColor=white)](https://vercel.com)
+[![Railway](https://img.shields.io/badge/Railway-Backend%20Cloud-0B0D0E?style=flat&logo=railway&logoColor=white)](https://railway.app)
+[![Groq](https://img.shields.io/badge/Groq-Llama%203.1%20Inference-F05A28?style=flat)](https://groq.com)
 [![Ollama](https://img.shields.io/badge/Ollama-Llama--3%20(Local)-white?style=flat&logo=ollama&logoColor=black)](https://ollama.com)
-[![ngrok](https://img.shields.io/badge/ngrok-Public%20Tunnel-blue?style=flat&logo=ngrok&logoColor=white)](https://ngrok.com)
 [![Tests](https://img.shields.io/badge/Tests-32%20Passed%20(100%25)-brightgreen?style=flat)](TEST_RESULTS.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-An enterprise-grade, locally deployed document intelligence platform that allows users to upload PDF documents, ask natural-language questions, retrieve relevant information, and receive answers strictly grounded in document evidence.
+An enterprise-grade document intelligence platform that allows users to upload PDF documents, ask natural-language questions, retrieve relevant passages, and receive answers strictly grounded in document evidence.
 
-Powered by **FastAPI**, **ChromaDB**, **Sentence Transformers (`BAAI/bge-small-en-v1.5`)**, and local **Ollama (`llama3:latest`)** running natively on Apple Silicon.
+**AskPDF** is designed for high reliability across both **Production Cloud Deployment** (Vercel Frontend + Railway FastAPI Backend with Persistent Storage + Hosted Llama 3.1 Inference) and **Local Offline Deployment** (Apple Silicon macOS + Ollama + Local ChromaDB).
 
 ---
 
 ## 📑 Core Documentation Index
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Modular design specification, 9-layer system diagram, and data flow.
-- **[RAG_PIPELINE.md](RAG_PIPELINE.md)**: Ingestion, page-aware chunking, dense vector indexing, and structural sampling strategies.
-- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)**: Complete REST API documentation for public and admin endpoints.
-- **[EVALUATION_REPORT.md](EVALUATION_REPORT.md)**: Real retrieval evaluation benchmarks (Recall@5, MRR, Citation Precision, Latency).
-- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)**: End-to-end setup, environment parameters, startup scripts, and port conflict resolution.
-- **[SECURITY_AUDIT.md](SECURITY_AUDIT.md)**: Vulnerability assessment, constant-time authentication, rate limiting, and defensive response parsing.
-- **[TEST_RESULTS.md](TEST_RESULTS.md)**: 32-test automated test suite execution logs and coverage breakdown.
-- **[BACKUP_AND_RECOVERY.md](BACKUP_AND_RECOVERY.md)**: Cold/hot snapshot procedures, disaster recovery runbooks, and vector re-indexing.
-- **[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)**: Hardware boundaries on Apple Silicon M4 16GB, OCR boundaries, and context window limits.
-- **[CHANGELOG.md](CHANGELOG.md)**: Complete version history and upgrade milestones.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Cloud and local system architecture, data flow, and 9-layer component specification.
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)**: Step-by-step production cloud setup for Vercel, Railway, and Groq Cloud.
+- **[RAG_PIPELINE.md](RAG_PIPELINE.md)**: Page-aware PDF ingestion, dense vector indexing, and hybrid reranking pipeline.
+- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)**: Complete REST API specification for public and administrative endpoints.
+- **[EVALUATION_REPORT.md](EVALUATION_REPORT.md)**: Verified ground-truth benchmark metrics (Recall@5: 100%, MRR: 0.905, Attribution: 100%).
+- **[SECURITY_AUDIT.md](SECURITY_AUDIT.md)**: Threat models, constant-time authentication, rate limiting, and defensive response parsing.
+- **[TEST_RESULTS.md](TEST_RESULTS.md)**: 32-test automated pytest execution logs and coverage breakdown.
+- **[BACKUP_AND_RECOVERY.md](BACKUP_AND_RECOVERY.md)**: Disaster recovery runbooks and persistent volume snapshot procedures.
+- **[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)**: Technical boundaries, context limits, and token constraints.
+- **[CHANGELOG.md](CHANGELOG.md)**: Complete upgrade history and release notes.
 
 ---
 
 ## ✨ Key Capabilities
 
-- **100% Local Inference & Data Privacy**: Executes entirely on your local machine using Ollama (`llama3`). Your sensitive documents, queries, and vectors never leave your device.
-- **Accurate Dual-Page Citations**: Never confuses physical PDF page index with printed report page numbers:
-  - *Physical PDF Page Number*: The 1-indexed page position in standard PDF readers (Apple Preview, Adobe Acrobat).
-  - *Printed Page Number*: The number printed on headers or footers (Arabic numbers or Roman numerals `i, ii, iii`).
-  - *Attribution format*: `Document.pdf — PDF page 4 (printed page 3)`.
-- **Table of Contents (TOC) Pollution Filtering**: Filters table-of-contents entries (`Abstract ......... 3`) from abstract queries, routing directly to substantive narrative sections.
-- **Intent Classification & Structural Summarization**: 
-  - Resolves ordinal requests (e.g. *"Summarize the first document"* -> Upload Order 1).
-  - Samples structural sections (Introduction, Architecture, Prototypes, and Conclusion) to synthesize complete 5-part executive summaries.
-- **Multi-Document Disambiguation & Conversational Memory**:
-  - Interactive clickable selection cards when a question is ambiguous across multiple PDFs.
-  - Multi-turn conversational memory (`session_id`) retains document scope across follow-up queries.
+- **24/7 Cloud Architecture (Laptop Independent)**:
+  - Deploys on **Vercel** (static frontend with dynamic API routing) and **Railway** (FastAPI backend in Docker container).
+  - Uses hosted OpenAI-compatible inference (**Groq Cloud** or **OpenAI**) so the application works even when your computer is switched off.
+- **Persistent Cloud Storage**:
+  - Railway persistent volume mounted at `/app/data` (PDFs) and `/app/db` (ChromaDB vector store + registry).
+  - Survives container restarts, code updates, and redeployments.
+- **Accurate Dual-Page Citations**:
+  - *Physical PDF Page Number*: The 1-indexed page position in standard PDF readers.
+  - *Printed Page Number*: The page number printed on headers or footers.
+  - *Citation format*: `Document.pdf — PDF page 4 (printed page 3)`.
+- **Anti-TOC Pollution & Section Extraction**:
+  - Automatically identifies and filters Table of Contents dot leaders (`Abstract ........ 3`), routing directly to substantive sections.
+  - Dedicated intent recognition for abstracts, executive summaries, conclusions, and cross-document comparisons.
+- **Hybrid Keyword Reranking**:
+  - Combines dense vector similarity (`BAAI/bge-small-en-v1.5`) with lexical query-overlap scoring and metadata heading boosting to achieve 100% Recall@5.
+- **Interactive Multi-Document Disambiguation**:
+  - Displays interactive selection cards when queries are ambiguous across multiple uploaded documents.
+  - Preserves document context across multi-turn follow-up queries using `session_id`.
 - **Hardened Security Architecture**:
-  - Administrative endpoints require header authentication via `X-Admin-Key` with constant-time verification (`secrets.compare_digest`).
-  - Magic-byte (`%PDF-`) verification and filename sanitization prevent malicious disguised uploads and path traversal.
-  - Per-IP sliding-window rate limiting (30 requests/minute).
-  - Defensive API response parsing (`parseApiResponse`) prevents UI crashes on HTML edge proxy errors.
+  - Administrative endpoints require header authentication (`X-Admin-Key`) verified with constant-time comparison (`secrets.compare_digest`).
+  - Strict magic-byte (`%PDF-`) validation and path traversal sanitization.
+  - Per-IP sliding-window rate limiting.
 
 ---
 
-## 🏗️ System Architecture
+## 🏗️ Dual-Mode Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           PRESENTATION LAYER                                │
-│   • index.html: Marked.js Markdown, Document Pills, Disambiguation Cards    │
-│   • admin.html: Defensive API Parsing, Session Tokens, Document Table       │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ HTTP / JSON
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                               API LAYER                                     │
-│   • main.py: FastAPI 0.115+, Lifespan Ingestion Sync, Sliding Rate Limiter  │
-│   • Endpoints: /health, /documents, /ask, /admin/upload-pdf, /admin/*       │
-│   • Multi-Turn Conversational Memory (session_id)                           │
-└───────────────────┬───────────────────────────────────────┬─────────────────┘
-                    │                                       │
-                    ▼                                       ▼
-┌──────────────────────────────────────┐  ┌───────────────────────────────────┐
-│     DOCUMENT MANAGEMENT LAYER        │  │       SECURITY LAYER              │
-│   • core/doc_registry.py             │  │   • Fail-Closed Admin Gatekeeper  │
-│   • Stable Upload Order (1st, 2nd)   │  │   • secrets.compare_digest()      │
-│   • Persistent Metadata Registry     │  │   • Magic-Byte (%PDF) Check       │
-└───────────────────┬──────────────────┘  └───────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          PDF PROCESSING LAYER                               │
-│   • core/pdf_processor.py: pypdf Engine, Password/Decryption Guardrails     │
-│   • Dual Page Numbering: Physical Index (1..N) vs Header/Footer Printed     │
-│   • Table of Contents (TOC) Detection & Section Heading Extraction          │
-└───────────────────┬───────────────────────────────────────┬─────────────────┘
-                    │                                       │
-                    ▼                                       ▼
-┌──────────────────────────────────────┐  ┌───────────────────────────────────┐
-│           RETRIEVAL LAYER            │  │        PERSISTENCE LAYER          │
-│   • core/retrieval.py                │  │   • core/vector_store.py          │
-│   • Intent Classifier (Abstract,     │  │   • ChromaDB Persistent Storage   │
-│     Summary, Compare, Factual QA)    │  │   • BAAI/bge-small-en-v1.5 Vectors│
-│   • Document Scope Isolation         │  │   • Schema Versioning (v2.0.0)    │
-│   • Anti-TOC Filtering Guardrail     │  │   • 32-Chunk Batching + GC Collect│
-└───────────────────┬──────────────────┘  └───────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           GENERATION LAYER                                  │
-│   • core/generation.py: Ollama llama3:latest with num_ctx=4096              │
-│   • Specialized Prompts: QA, Abstract, Summarization, Comparison            │
-│   • Exact Citation Builder: Document.pdf — PDF page X (printed page Y)      │
-└─────────────────────────────────────────────────────────────────────────────┘
+                                  PUBLIC USERS (Browser)
+                                             │
+                       ┌─────────────────────┴─────────────────────┐
+                       │                                           │
+                       ▼                                           ▼
+       ┌───────────────────────────────┐           ┌───────────────────────────────┐
+       │   CLOUD PRODUCTION (Vercel)   │           │    LOCAL WORKSTATION (Mac)    │
+       │    https://askpdf.vercel.app  │           │     http://localhost:8000     │
+       └───────────────┬───────────────┘           └───────────────┬───────────────┘
+                       │ HTTPS / CORS                              │ HTTP
+                       ▼                                           ▼
+       ┌───────────────────────────────┐           ┌───────────────────────────────┐
+       │   RAILWAY FASTAPI CONTAINER   │           │    LOCAL FASTAPI INSTANCE     │
+       │    FastAPI + Uvicorn ($PORT)  │           │   FastAPI + Uvicorn (Port 8000│
+       ├───────────────────────────────┤           ├───────────────────────────────┤
+       │ • Persistent Volume (/app/db) │           │ • Local Storage (./data, ./db)│
+       │ • BGE-Small CPU Embeddings    │           │ • BGE-Small CPU Embeddings    │
+       │ • Groq Cloud (Llama 3.1 8B)   │           │ • Ollama Local (Llama 3 8B)   │
+       └───────────────────────────────┘           └───────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Cloud Deployment
 
-### 1. Prerequisites
-- **macOS** with Apple Silicon (M1/M2/M3/M4, 16 GB unified RAM recommended).
-- **Python 3.11** installed.
-- **Ollama** installed with `llama3:latest` pulled (`ollama pull llama3:latest`).
-- **ngrok CLI** installed and authenticated.
+### 1. Deploy Backend on Railway
+1. Push to GitHub repo `https://github.com/safalyareddy/askpdf`.
+2. Connect the repository in [Railway](https://railway.app).
+3. Railway automatically builds via `Dockerfile` and `railway.json`.
+4. Attach a **Persistent Volume** mounted at `/app/data` and `/app/db`.
+5. Set environment variables:
+   ```env
+   PORT=8000
+   LLM_PROVIDER=groq
+   LLM_BASE_URL=https://api.groq.com/openai/v1
+   LLM_MODEL=llama-3.1-8b-instant
+   LLM_API_KEY=gsk_your_groq_api_key_here
+   SUPER_USER_KEY=your_secure_admin_key_here
+   ```
+6. Generate a public domain (e.g., `https://askpdf-production.up.railway.app`).
 
-### 2. Configure Environment
-Copy `.env.example` to `.env` and set your secure admin key:
+### 2. Deploy Frontend on Vercel
+1. In [Vercel](https://vercel.com), import `safalyareddy/askpdf`.
+2. Use Framework Preset `Other` with root directory `./`.
+3. Click **Deploy**. Vercel serves the application according to `vercel.json`.
+4. In the deployed frontend, click the system status badge to save your Railway backend domain in the settings modal.
+
+---
+
+## 💻 Local Apple Silicon Setup
+
 ```bash
-cp .env.example .env
-```
-Ensure `.env` contains:
-```env
-LLM_PROVIDER=ollama
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3:latest
-OLLAMA_NUM_CTX=4096
-SUPER_USER_KEY=your_secure_random_key_here
-```
+# 1. Setup Virtual Environment
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
-### 3. One-Click Startup
-Launch the entire AskPDF stack (Ollama validation, Uvicorn on port 8000, and ngrok public tunnel):
-```bash
+# 2. Start Local Ollama
+ollama serve &
+ollama pull llama3:latest
+
+# 3. Launch AskPDF
 ./START_ASKPDF.sh
 ```
 
-### 4. Safe Shutdown
-Stop Uvicorn and ngrok gracefully without terminating unrelated processes:
-```bash
-./STOP_ASKPDF.sh
-```
+- Web UI: `http://localhost:8000`
+- Admin Portal: `http://localhost:8000/admin`
+- Health: `http://localhost:8000/health`
+- API Docs: `http://localhost:8000/docs`
 
 ---
 
-## 🧪 Automated Testing & Evaluation
+## 🧪 Evaluation Benchmark Results
 
-### Run Automated Test Suite (32 tests):
-```bash
-.venv/bin/pytest -v
-```
+Tested against verified ground-truth student project reports (`23MIS0125_ListLocal_Safalya.pdf` and `23MIS0125_FreshCart_Lab_Assignment_8.pdf`):
 
-### Run Ground Truth Retrieval Benchmark:
-```bash
-.venv/bin/python scratch/evaluate_benchmark.py
-```
+| Metric | Target | Measured Value | Status |
+| :--- | :--- | :--- | :--- |
+| **Recall@5** | ≥ 80.0% | **100.0%** | **PASS** |
+| **Mean Reciprocal Rank (MRR)** | ≥ 0.70 | **0.905** | **PASS** |
+| **Page Attribution Accuracy** | 100.0% | **100.0%** | **PASS** |
+| **Session Memory Retention** | 100.0% | **100.0%** | **PASS** |
+| **TOC Pollution Rate** | 0.0% | **0.0%** (Clean) | **PASS** |
+| **Mean Latency (Local CPU)** | < 25.0s | **17.19s** | **PASS** |
+| **Citation Precision** | Reference | **46.2%** | *Evaluated* |
 
-**Measured Benchmark Summary:**
-- **Recall@5:** 57.1%
-- **Mean Reciprocal Rank (MRR):** 0.571
-- **Citation Precision:** 49.0%
-- **Page Attribution Accuracy:** 100.0%
-- **Session Memory Retention:** 100.0% (Passed)
-- **TOC Pollution Rate:** 0.0% (Zero TOC entries cited)
-
----
-
-## 🌐 Public Tunnel & Local Endpoints
-
-- **Public Q&A Interface**: [https://yer-superindifferent-lore.ngrok-free.dev](https://yer-superindifferent-lore.ngrok-free.dev)
-- **Public Document Management**: [https://yer-superindifferent-lore.ngrok-free.dev/admin](https://yer-superindifferent-lore.ngrok-free.dev/admin)
-- **Local Q&A Interface**: [http://localhost:8000](http://localhost:8000)
-- **Local Document Management**: [http://localhost:8000/admin](http://localhost:8000/admin)
-- **Local Backend Health**: [http://localhost:8000/health](http://localhost:8000/health)
+> *Note on Citation Precision:* In multi-chunk dense retrieval, top-5 context windows naturally contain broader section evidence alongside targeted sentences. Furthermore, unanswerable queries return nearest background passages which the guardrail correctly refuses to synthesize, resulting in clean 0-citation refusals.
 
 ---
 
