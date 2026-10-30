@@ -97,12 +97,44 @@ class OpenAILikeLLM(LLM):
             headers["Authorization"] = f"Bearer {self.api_key.strip()}"
 
         candidate_models = [self.model]
+        
+        # Dynamic model discovery from provider
+        if self.api_key:
+            try:
+                models_url = f"{clean_base}/models"
+                with httpx.Client(timeout=5.0) as client:
+                    m_res = client.get(models_url, headers=headers)
+                    if m_res.status_code == 200:
+                        m_data = m_res.json().get("data", [])
+                        valid_ids = [m["id"] for m in m_data if isinstance(m, dict) and "id" in m]
+                        # Prioritize available models that match current model or standard chat models
+                        prioritized = [
+                            mid for mid in valid_ids 
+                            if any(k in mid.lower() for k in ["llama", "mixtral", "gemma", "qwen", "gpt"])
+                            and "whisper" not in mid.lower() and "guard" not in mid.lower()
+                        ]
+                        for p in prioritized:
+                            if p not in candidate_models:
+                                candidate_models.append(p)
+            except Exception as e:
+                logger.debug(f"Dynamic model discovery skipped: {e}")
+
         if "groq.com" in clean_base:
-            for fallback in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
+            groq_fallbacks = [
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
+                "llama-3.1-70b-versatile",
+                "llama3-70b-8192",
+                "llama3-8b-8192",
+                "mixtral-8x7b-32768",
+                "gemma2-9b-it"
+            ]
+            for fallback in groq_fallbacks:
                 if fallback not in candidate_models:
                     candidate_models.append(fallback)
 
         last_error = None
+        attempted_errors = []
         for candidate in candidate_models:
             payload = {
                 "model": candidate,
@@ -114,15 +146,19 @@ class OpenAILikeLLM(LLM):
                     res = client.post(url, json=payload, headers=headers)
                     if res.status_code == 200:
                         return res.json()["choices"][0]["message"]["content"]
-                    last_error = f"HTTP {res.status_code} ({res.text})"
-                    if res.status_code == 404 and candidate != candidate_models[-1]:
+                    err_msg = f"model '{candidate}': HTTP {res.status_code} ({res.text})"
+                    last_error = err_msg
+                    attempted_errors.append(err_msg)
+                    if res.status_code in [400, 404] and candidate != candidate_models[-1]:
                         continue
                     break
             except Exception as e:
-                last_error = str(e)
+                err_msg = f"model '{candidate}': {str(e)}"
+                last_error = err_msg
+                attempted_errors.append(err_msg)
                 break
 
-        raise RuntimeError(f"Hosted LLM error: {last_error}")
+        raise RuntimeError(f"Hosted LLM error: {last_error} (Attempted: {'; '.join(attempted_errors[:3])})")
 
 
 class GenerationEngine:
