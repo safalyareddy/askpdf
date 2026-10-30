@@ -154,13 +154,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Restrict CORS to standard web methods
+# Production CORS configuration: allow Vercel production, preview branches, and localhost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://askpdf-omega.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:5500",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 templates = Jinja2Templates(directory=".")
