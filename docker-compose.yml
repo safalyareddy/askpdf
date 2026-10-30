@@ -1,28 +1,53 @@
 services:
-  documind-app:
+  askpdf-backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: documind-app
+    container_name: askpdf-backend
+    restart: always
     ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
-      - ./db:/app/db
+      - "127.0.0.1:8000:8000"
     environment:
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      - SUPER_USER_KEY=${SUPER_USER_KEY:-documind-dev-supersecretkey-change-in-prod}
-      - LLM_MODEL=${LLM_MODEL:-llama3}
+      - PORT=8000
+      - STORAGE_DIR=/app/storage
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai_compatible}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      - LLM_MODEL=${LLM_MODEL:-llama-3.3-70b-versatile}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - SUPER_USER_KEY=${SUPER_USER_KEY:-supersecretkey}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
-      - PERSIST_DIR=/app/db
-      - PDF_DIR=/app/data
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-20}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
+    volumes:
+      - ./storage:/app/storage
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 15s
+      interval: 20s
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - askpdf-network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: askpdf-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+    depends_on:
+      askpdf-backend:
+        condition: service_healthy
+    networks:
+      - askpdf-network
+
+networks:
+  askpdf-network:
+    driver: bridge

@@ -1,0 +1,27 @@
+# AskPDF Production Caddyfile
+# Supports custom domains, OCI public IPs with sslip.io/nip.io, or localhost
+
+{$DOMAIN:localhost} {
+    encode gzip zstd
+
+    # Allow PDF uploads up to 25MB
+    request_body {
+        max_size 25MB
+    }
+
+    # Production Security Headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Reverse proxy to FastAPI backend container
+    reverse_proxy askpdf-backend:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

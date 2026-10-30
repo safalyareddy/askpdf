@@ -14,8 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# Install PyTorch CPU wheel from official PyTorch repository
-RUN pip install --no-cache-dir torch --extra-index-url https://download.pytorch.org/whl/cpu
+# Install PyTorch CPU wheel (compatible with both ARM64 aarch64 and x86_64)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu || \
+    pip install --no-cache-dir torch
 
 # Install remaining Python dependencies
 COPY requirements.txt .
