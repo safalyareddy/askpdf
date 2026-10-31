@@ -921,29 +921,60 @@
             }
 
             try {
-                const res = await fetch(`${apiBase}/health`);
-                if (res.ok) {
-                    const data = await res.json();
-                    const providerLabel = data.provider === 'ollama' ? 'Ollama' : (data.provider === 'openai_compatible' ? 'AI Cloud' : (data.provider || '').toUpperCase());
-                    if (data.model_online) {
-                        statusText.textContent = `${providerLabel} Online (${data.model || 'Active'})`;
+                // Multi-endpoint check: /api/status first (ad-block safe), then /models, then /health
+                let res = null;
+                const endpoints = [`${apiBase}/api/status`, `${apiBase}/models`, `${apiBase}/health`];
+                for (const url of endpoints) {
+                    try {
+                        const r = await fetch(url);
+                        if (r && r.ok) {
+                            res = r;
+                            break;
+                        }
+                    } catch (e) {
+                        // proceed to next fallback endpoint
+                    }
+                }
+
+                if (!res) throw new Error("Backend endpoints unreachable");
+
+                const data = await res.json();
+                const provider = data.provider || data.current_provider || 'ai';
+                const model = data.model || data.current_model || 'Active';
+                const providerLabel = provider === 'ollama' ? 'Ollama' : (provider === 'openai_compatible' ? 'AI Cloud' : provider.toUpperCase());
+                const isOnline = data.model_online !== undefined ? data.model_online : (data.status === 'online' || data.status === 'healthy');
+
+                if (isOnline) {
+                    if (statusText) statusText.textContent = `${providerLabel} Online (${model})`;
+                    if (dot) {
                         dot.style.background = '#10b981';
-                    } else {
-                        statusText.textContent = `${providerLabel} Offline`;
-                        dot.style.background = '#ef4444';
+                        dot.style.boxShadow = '0 0 8px #10b981';
                     }
                 } else {
-                    if (statusText) statusText.textContent = "Backend Offline";
-                    if (dot) dot.style.background = '#ef4444';
+                    if (statusText) statusText.textContent = `${providerLabel} Offline`;
+                    if (dot) {
+                        dot.style.background = '#ef4444';
+                        dot.style.boxShadow = '0 0 8px #ef4444';
+                    }
                 }
             } catch (err) {
-                console.warn("Health check unreachable:", err);
+                console.warn("Status check notice:", err);
                 if (statusText) statusText.textContent = "Backend Cold Start / Reconnecting...";
-                if (dot) dot.style.background = '#f59e0b';
+                if (dot) {
+                    dot.style.background = '#f59e0b';
+                    dot.style.boxShadow = '0 0 8px #f59e0b';
+                }
+                // Quick retry during cold start or initial reconnect
+                if (!window._healthRetryTimer) {
+                    window._healthRetryTimer = setTimeout(() => {
+                        window._healthRetryTimer = null;
+                        checkHealth();
+                    }, 4000);
+                }
             }
         }
         checkHealth();
-        setInterval(checkHealth, 25000);
+        setInterval(checkHealth, 20000);
 
         // Load available documents for pill selector
         async function loadDocumentPills() {

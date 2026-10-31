@@ -186,6 +186,8 @@ class Question(BaseModel):
 
 @app.get("/health")
 @app.get("/healthz")
+@app.get("/api/status")
+@app.get("/api/system/status")
 async def health_check():
     """Health check endpoint for local monitoring, Docker, and ngrok."""
     pdf_count = len([f for f in os.listdir(PDF_DIR) if f.lower().endswith(".pdf")]) if os.path.exists(PDF_DIR) else 0

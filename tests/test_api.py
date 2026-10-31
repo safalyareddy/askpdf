@@ -22,6 +22,15 @@ def test_health_check():
     assert res_z.status_code == 200
     assert res_z.json()["status"] == "healthy"
 
+    # Verify ad-blocker safe aliases /api/status and /api/system/status
+    res_api = client.get("/api/status")
+    assert res_api.status_code == 200
+    assert res_api.json()["status"] == "healthy"
+
+    res_sys = client.get("/api/system/status")
+    assert res_sys.status_code == 200
+    assert res_sys.json()["status"] == "healthy"
+
 
 def test_html_pages():
     res_home = client.get("/")
