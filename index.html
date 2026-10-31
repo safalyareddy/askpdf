@@ -7,31 +7,45 @@
     <meta name="description" content="AskPDF — An AI-powered document intelligence platform that lets users upload PDF documents, ask natural-language questions, retrieve relevant information, and receive answers grounded in document evidence.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="/config.js"></script>
     <!-- Marked.js for rich Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
-            --bg: #090d16;
-            --surface: #111827;
-            --surface-card: rgba(17, 24, 39, 0.85);
-            --surface-hover: #1f2937;
+            --bg-base: #060911;
+            --bg-surface: #0c1220;
+            --bg-surface-elevated: #111a2e;
+            --bg-card: rgba(15, 23, 42, 0.75);
+            --bg-card-hover: rgba(22, 33, 58, 0.85);
+            --border-subtle: rgba(255, 255, 255, 0.07);
+            --border-medium: rgba(255, 255, 255, 0.12);
+            --border-glow: rgba(56, 189, 248, 0.35);
+            
             --primary: #38bdf8;
-            --primary-glow: rgba(56, 189, 248, 0.25);
+            --primary-light: #7dd3fc;
+            --primary-glow: rgba(56, 189, 248, 0.22);
             --accent: #818cf8;
-            --border: #1f293d;
-            --border-hover: #374151;
-            --text-main: #f9fafb;
-            --text-muted: #9ca3af;
-            --text-sub: #6b7280;
-            --citation-bg: #0d1527;
-            --citation-border: #1e2942;
-            --tag-bg: rgba(56, 189, 248, 0.12);
-            --tag-text: #7dd3fc;
-            --radius-sm: 8px;
-            --radius-md: 14px;
-            --radius-lg: 20px;
+            --accent-glow: rgba(129, 140, 248, 0.2);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.25);
+            --warning: #f59e0b;
+            --danger: #ef4444;
+
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --text-subtle: #64748b;
+
+            --radius-xs: 6px;
+            --radius-sm: 10px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            --radius-full: 9999px;
+
+            --shadow-subtle: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+            --shadow-elevated: 0 12px 40px -8px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+            --shadow-glow: 0 0 35px -5px var(--primary-glow);
         }
 
         * {
@@ -41,186 +55,331 @@
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: radial-gradient(circle at 50% 0%, #172554 0%, #090d16 65%);
-            color: var(--text-main);
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(ellipse 90% 50% at 50% -10%, rgba(56, 189, 248, 0.13), transparent 70%),
+                radial-gradient(ellipse 60% 40% at 85% 15%, rgba(129, 140, 248, 0.1), transparent 60%),
+                radial-gradient(ellipse 50% 30% at 15% 25%, rgba(14, 165, 233, 0.08), transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Header */
+        /* Ambient Glow Grid */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Header Navigation */
         header {
-            border-bottom: 1px solid var(--border);
-            background: rgba(9, 13, 22, 0.85);
-            backdrop-filter: blur(16px);
             position: sticky;
             top: 0;
             z-index: 100;
+            border-bottom: 1px solid var(--border-subtle);
+            background: rgba(6, 9, 17, 0.78);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transition: all 0.25s ease;
         }
 
         .nav-container {
-            max-width: 1100px;
+            max-width: 1140px;
             margin: 0 auto;
-            padding: 0.9rem 1.5rem;
+            padding: 0.85rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: relative;
+            z-index: 2;
         }
 
         .brand-container {
             display: flex;
             align-items: center;
-            gap: 0.85rem;
+            gap: 0.9rem;
             text-decoration: none;
             color: inherit;
+            group: cursor;
+        }
+
+        .brand-logo-wrapper {
+            position: relative;
         }
 
         .brand-logo {
-            width: 38px;
-            height: 38px;
-            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
             border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 0 20px var(--primary-glow);
+            box-shadow: 0 0 25px var(--primary-glow);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+        }
+
+        .brand-container:hover .brand-logo {
+            transform: scale(1.05) rotate(-2deg);
+            box-shadow: 0 0 32px rgba(56, 189, 248, 0.4);
         }
 
         .brand-logo svg {
-            width: 22px;
-            height: 22px;
-            color: #090d16;
+            width: 24px;
+            height: 24px;
+            color: #060911;
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
         }
 
         .brand-text h1 {
-            font-size: 1.25rem;
+            font-size: 1.35rem;
             font-weight: 800;
-            letter-spacing: -0.02em;
+            letter-spacing: -0.03em;
             background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            line-height: 1.15;
         }
 
         .brand-text p {
             font-size: 0.72rem;
             color: var(--text-muted);
             font-weight: 500;
+            letter-spacing: 0.01em;
         }
 
         .nav-actions {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.85rem;
         }
 
+        /* Status Badge */
         .status-badge {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.4rem 0.85rem;
-            border-radius: 9999px;
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.25);
+            gap: 0.55rem;
+            padding: 0.45rem 0.95rem;
+            border-radius: var(--radius-full);
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.28);
             font-size: 0.78rem;
             color: #34d399;
             font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .status-badge:hover {
+            background: rgba(16, 185, 129, 0.14);
+            border-color: rgba(16, 185, 129, 0.45);
+            transform: translateY(-1px);
+        }
+
+        .status-dot-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .status-dot {
-            width: 7px;
-            height: 7px;
-            background: #10b981;
+            width: 8px;
+            height: 8px;
+            background: var(--success);
             border-radius: 50%;
-            box-shadow: 0 0 8px #10b981;
-            animation: pulse 2s infinite;
+            box-shadow: 0 0 10px var(--success);
+            transition: all 0.3s ease;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(0.85); }
+        .status-ping {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(16, 185, 129, 0.4);
+            animation: ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+            pointer-events: none;
+        }
+
+        @keyframes ping {
+            0% { transform: scale(0.6); opacity: 0.9; }
+            75%, 100% { transform: scale(2.2); opacity: 0; }
         }
 
         .admin-link-btn {
             display: inline-flex;
             align-items: center;
-            gap: 0.45rem;
-            padding: 0.5rem 1rem;
+            gap: 0.5rem;
+            padding: 0.5rem 1.05rem;
             border-radius: var(--radius-sm);
-            background: var(--surface-hover);
-            color: var(--text-main);
-            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+            border: 1px solid var(--border-medium);
             text-decoration: none;
             font-size: 0.82rem;
             font-weight: 600;
-            transition: all 0.2s ease;
+            transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px);
         }
 
         .admin-link-btn:hover {
+            background: rgba(56, 189, 248, 0.08);
             border-color: var(--primary);
-            color: var(--primary);
-            box-shadow: 0 0 14px var(--primary-glow);
+            color: var(--primary-light);
+            box-shadow: 0 0 18px var(--primary-glow);
+            transform: translateY(-1px);
         }
 
-        /* Main Container */
+        /* Main Content Container */
         main {
             flex: 1;
-            max-width: 960px;
+            max-width: 980px;
             width: 100%;
             margin: 0 auto;
-            padding: 2rem 1.5rem 7rem;
+            padding: 2.25rem 1.5rem 9rem;
             display: flex;
             flex-direction: column;
-            gap: 1.75rem;
+            gap: 2rem;
+            position: relative;
+            z-index: 1;
         }
 
-        /* Hero */
+        /* Hero Section */
         .hero {
             text-align: center;
-            padding: 1.25rem 0 0.5rem;
+            padding: 1rem 0 0.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.85rem;
         }
 
         .hero-tag {
-            display: inline-block;
-            padding: 0.35rem 0.9rem;
-            background: var(--tag-bg);
-            color: var(--tag-text);
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            border-radius: 9999px;
-            font-size: 0.78rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.35rem 1rem;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(129, 140, 248, 0.12) 100%);
+            color: var(--primary-light);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: var(--radius-full);
+            font-size: 0.74rem;
             font-weight: 700;
-            margin-bottom: 0.75rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.07em;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);
+        }
+
+        .hero-tag svg {
+            width: 13px;
+            height: 13px;
+            color: var(--primary);
         }
 
         .hero h2 {
-            font-size: 2.1rem;
+            font-size: 2.75rem;
             font-weight: 800;
-            letter-spacing: -0.03em;
-            line-height: 1.2;
-            margin-bottom: 0.5rem;
+            letter-spacing: -0.04em;
+            line-height: 1.15;
+            background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            max-width: 720px;
+        }
+
+        .hero h2 span.gradient-text {
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .hero p {
-            color: var(--text-muted);
-            font-size: 1rem;
+            color: var(--text-secondary);
+            font-size: 1.05rem;
             max-width: 640px;
-            margin: 0 auto 1.25rem;
-            line-height: 1.6;
+            margin: 0 auto;
+            line-height: 1.65;
+            font-weight: 400;
         }
 
-        /* Document Selection Bar */
+        /* Example Chips */
+        .example-chips {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.55rem;
+            margin-top: 0.65rem;
+            max-width: 820px;
+        }
+
+        .chip {
+            background: rgba(17, 26, 46, 0.65);
+            border: 1px solid var(--border-subtle);
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-full);
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .chip svg {
+            width: 13px;
+            height: 13px;
+            color: var(--primary);
+            opacity: 0.75;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .chip:hover {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--primary-light);
+            border-color: rgba(56, 189, 248, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.15);
+        }
+
+        .chip:hover svg {
+            transform: scale(1.15);
+            opacity: 1;
+        }
+
+        /* Document Scope Bar */
         .doc-selector-bar {
-            background: var(--surface-card);
-            border: 1px solid var(--border);
+            background: var(--bg-card);
+            border: 1px solid var(--border-medium);
             border-radius: var(--radius-md);
             padding: 0.85rem 1.25rem;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.9rem;
             flex-wrap: wrap;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-subtle);
+            transition: border-color 0.25s ease;
+        }
+
+        .doc-selector-bar:hover {
+            border-color: rgba(255, 255, 255, 0.18);
         }
 
         .doc-selector-label {
@@ -229,7 +388,12 @@
             color: var(--text-muted);
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .doc-selector-label svg {
+            color: var(--primary);
         }
 
         .doc-pills {
@@ -240,299 +404,386 @@
         }
 
         .doc-pill {
-            background: rgba(31, 41, 55, 0.7);
-            border: 1px solid var(--border);
-            border-radius: 9999px;
-            padding: 0.35rem 0.85rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.38rem 0.9rem;
             font-size: 0.78rem;
             font-weight: 600;
             color: var(--text-muted);
             cursor: pointer;
             transition: all 0.2s ease;
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.45rem;
+            user-select: none;
         }
 
         .doc-pill:hover {
             border-color: var(--primary);
-            color: var(--text-main);
-        }
-
-        .doc-pill.active {
-            background: rgba(56, 189, 248, 0.15);
-            border-color: var(--primary);
-            color: var(--primary);
-            box-shadow: 0 0 12px var(--primary-glow);
-        }
-
-        /* Example Query Chips */
-        .example-chips {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 0.5rem;
-            margin-top: 0.25rem;
-        }
-
-        .chip {
-            background: rgba(31, 41, 55, 0.5);
-            border: 1px solid var(--border);
-            padding: 0.45rem 0.9rem;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .chip:hover {
-            background: var(--surface-hover);
-            color: var(--primary);
-            border-color: var(--primary);
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.08);
             transform: translateY(-1px);
         }
 
-        /* Disambiguation Card */
-        .disambiguation-card {
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(56, 189, 248, 0.35);
-            border-radius: var(--radius-md);
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .disambiguation-title {
-            font-size: 0.95rem;
-            font-weight: 700;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .disambiguation-options {
-            display: flex;
-            flex-direction: column;
-            gap: 0.6rem;
-        }
-
-        .disambiguation-btn {
-            background: rgba(17, 24, 39, 0.9);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 0.75rem 1rem;
-            color: var(--text-main);
-            font-family: inherit;
-            font-size: 0.88rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-align: left;
-            transition: all 0.2s ease;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .disambiguation-btn:hover {
+        .doc-pill.active {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(99, 102, 241, 0.18) 100%);
             border-color: var(--primary);
-            background: rgba(56, 189, 248, 0.08);
-            transform: translateX(3px);
+            color: var(--primary-light);
+            box-shadow: 0 0 16px var(--primary-glow);
         }
 
-        /* Results / Answer Feed */
-        .results-container {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .result-card {
-            background: var(--surface-card);
-            border: 1px solid var(--border);
+        /* Multi-step Thinking / Loading Skeleton */
+        .loading-card {
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border-glow);
             border-radius: var(--radius-md);
             padding: 1.75rem;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-            display: flex;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-elevated), var(--shadow-glow);
             flex-direction: column;
             gap: 1.25rem;
             animation: fadeIn 0.3s ease;
         }
 
+        .loading-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .loading-step-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--primary-light);
+        }
+
+        .spinner-ring {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(56, 189, 248, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .pipeline-steps {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.76rem;
+            color: var(--text-subtle);
+            font-weight: 600;
+            border-top: 1px solid var(--border-subtle);
+            padding-top: 0.75rem;
+        }
+
+        .pipeline-step {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .pipeline-step.active {
+            color: var(--primary);
+        }
+
+        .pipeline-step-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .loading-text-line {
+            height: 14px;
+            background: linear-gradient(90deg, #162035 25%, #253352 50%, #162035 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.6s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Results Feed */
+        .results-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.75rem;
+        }
+
+        .result-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-medium);
+            border-radius: var(--radius-md);
+            padding: 1.85rem;
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-elevated);
+            display: flex;
+            flex-direction: column;
+            gap: 1.35rem;
+            animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: border-color 0.25s ease;
+        }
+
+        .result-card:hover {
+            border-color: rgba(56, 189, 248, 0.25);
+        }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
+            from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
+        /* User Query Bar */
         .result-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 0.85rem;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 1rem;
             flex-wrap: wrap;
-            gap: 0.5rem;
+            gap: 0.75rem;
         }
 
-        .result-query-badge {
+        .user-query-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex: 1;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-light);
+            flex-shrink: 0;
+        }
+
+        .user-query-text {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+
+        .result-actions {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            font-weight: 700;
-            font-size: 0.98rem;
-            color: var(--text-main);
         }
 
-        .copy-btn {
-            background: transparent;
-            border: none;
+        .action-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
             color: var(--text-muted);
             cursor: pointer;
-            padding: 0.35rem 0.65rem;
+            padding: 0.4rem 0.8rem;
             border-radius: var(--radius-sm);
-            font-size: 0.8rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .action-btn:hover {
+            color: var(--primary-light);
+            background: rgba(56, 189, 248, 0.1);
+            border-color: rgba(56, 189, 248, 0.3);
+            transform: translateY(-1px);
+        }
+
+        /* AI Answer Body */
+        .ai-response-meta {
             display: flex;
             align-items: center;
-            gap: 0.35rem;
-            transition: all 0.2s ease;
-        }
-
-        .copy-btn:hover {
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 700;
             color: var(--primary);
-            background: rgba(56, 189, 248, 0.1);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
-        /* Answer Body Typography (Markdown) */
         .answer-body {
-            font-size: 0.98rem;
-            line-height: 1.75;
-            color: #e5e7eb;
+            font-size: 1rem;
+            line-height: 1.8;
+            color: #e2e8f0;
             word-break: break-word;
             overflow-x: auto;
         }
 
         .answer-body h1, .answer-body h2, .answer-body h3, .answer-body h4 {
             color: #ffffff;
-            margin: 1.1rem 0 0.5rem;
-            font-weight: 700;
-            letter-spacing: -0.01em;
+            margin: 1.35rem 0 0.65rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
         }
 
-        .answer-body h1 { font-size: 1.35rem; }
-        .answer-body h2 { font-size: 1.2rem; }
-        .answer-body h3 { font-size: 1.05rem; color: #7dd3fc; }
+        .answer-body h1 { font-size: 1.4rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.4rem; }
+        .answer-body h2 { font-size: 1.25rem; }
+        .answer-body h3 { font-size: 1.1rem; color: var(--primary-light); }
 
         .answer-body p {
-            margin-bottom: 0.85rem;
+            margin-bottom: 1rem;
+        }
+
+        .answer-body strong {
+            color: #ffffff;
+            font-weight: 700;
         }
 
         .answer-body ul, .answer-body ol {
-            margin: 0.5rem 0 0.85rem 1.4rem;
+            margin: 0.65rem 0 1rem 1.5rem;
         }
 
         .answer-body li {
-            margin-bottom: 0.35rem;
+            margin-bottom: 0.45rem;
+            padding-left: 0.2rem;
         }
 
         .answer-body blockquote {
             border-left: 3px solid var(--primary);
-            padding: 0.5rem 1rem;
-            margin: 0.75rem 0;
+            padding: 0.75rem 1.25rem;
+            margin: 1rem 0;
             background: rgba(56, 189, 248, 0.05);
             border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-            color: #cbd5e1;
+            color: var(--text-secondary);
+            font-style: italic;
         }
 
         .answer-body table {
             width: 100%;
-            border-collapse: collapse;
-            margin: 1rem 0;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 1.25rem 0;
             font-size: 0.88rem;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            border: 1px solid var(--border-medium);
         }
 
         .answer-body th, .answer-body td {
-            border: 1px solid var(--border);
-            padding: 0.6rem 0.85rem;
+            padding: 0.75rem 1rem;
             text-align: left;
+            border-bottom: 1px solid var(--border-subtle);
         }
 
         .answer-body th {
-            background: rgba(0, 0, 0, 0.35);
-            color: var(--primary);
+            background: rgba(15, 23, 42, 0.95);
+            color: var(--primary-light);
             font-weight: 700;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
 
-        .answer-body tr:nth-child(even) {
-            background: rgba(255, 255, 255, 0.02);
+        .answer-body tr:last-child td {
+            border-bottom: none;
+        }
+
+        .answer-body tr:nth-child(even) td {
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .answer-body tr:hover td {
+            background: rgba(56, 189, 248, 0.04);
         }
 
         .answer-body code {
             font-family: 'JetBrains Mono', monospace;
-            background: rgba(0, 0, 0, 0.35);
-            padding: 0.2rem 0.4rem;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 0.2rem 0.45rem;
             border-radius: 4px;
-            font-size: 0.85rem;
+            font-size: 0.86rem;
             color: #38bdf8;
+            border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .answer-body pre {
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid var(--border);
+            background: #090d18;
+            border: 1px solid var(--border-medium);
             border-radius: var(--radius-sm);
-            padding: 0.85rem 1.1rem;
+            padding: 1.1rem;
             overflow-x: auto;
-            margin: 0.85rem 0;
+            margin: 1.1rem 0;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .answer-body pre code {
             background: transparent;
             padding: 0;
+            border: none;
             color: #e2e8f0;
+            font-size: 0.88rem;
         }
 
         /* Citations Section */
         .citations-section {
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
-            border-top: 1px solid var(--border);
-            padding-top: 1.1rem;
+            gap: 0.85rem;
+            border-top: 1px solid var(--border-subtle);
+            padding-top: 1.25rem;
         }
 
         .citations-title {
             font-size: 0.82rem;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
             color: var(--text-muted);
             display: flex;
             align-items: center;
-            gap: 0.45rem;
+            gap: 0.5rem;
+        }
+
+        .citations-title svg {
+            color: var(--accent);
         }
 
         .citations-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 0.85rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 0.95rem;
         }
 
         .citation-card {
-            background: var(--citation-bg);
-            border: 1px solid var(--citation-border);
+            background: rgba(9, 14, 26, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.07);
             border-radius: var(--radius-sm);
-            padding: 0.85rem 1rem;
+            padding: 0.95rem 1.15rem;
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
-            transition: border-color 0.2s ease;
+            gap: 0.6rem;
+            transition: all 0.22s ease;
         }
 
         .citation-card:hover {
             border-color: rgba(56, 189, 248, 0.4);
+            background: rgba(12, 19, 36, 0.85);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
         }
 
         .citation-top {
@@ -545,181 +796,253 @@
         .citation-doc-name {
             font-size: 0.82rem;
             font-weight: 700;
-            color: var(--primary);
+            color: var(--primary-light);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
         }
 
         .citation-badge {
-            background: rgba(129, 140, 248, 0.18);
-            color: #c7d2fe;
-            border: 1px solid rgba(129, 140, 248, 0.3);
+            background: rgba(99, 102, 241, 0.16);
+            color: #a5b4fc;
+            border: 1px solid rgba(99, 102, 241, 0.32);
             font-size: 0.72rem;
             font-weight: 700;
-            padding: 0.2rem 0.55rem;
-            border-radius: 9999px;
+            padding: 0.22rem 0.65rem;
+            border-radius: var(--radius-full);
             white-space: nowrap;
         }
 
         .citation-snippet {
             font-size: 0.82rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 0.55rem;
-            border-radius: 6px;
+            color: var(--text-secondary);
+            line-height: 1.55;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 0.65rem 0.8rem;
+            border-radius: var(--radius-xs);
             font-style: italic;
+            border-left: 2px solid rgba(56, 189, 248, 0.3);
         }
 
-        /* Loading Skeleton */
-        .loading-card {
-            display: none;
-            background: var(--surface-card);
-            border: 1px solid var(--border);
+        /* Disambiguation Card */
+        .disambiguation-card {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(56, 189, 248, 0.4);
             border-radius: var(--radius-md);
             padding: 1.75rem;
-            backdrop-filter: blur(12px);
+            display: flex;
             flex-direction: column;
-            gap: 1rem;
-            animation: pulse-glow 1.8s infinite;
+            gap: 1.15rem;
+            box-shadow: var(--shadow-elevated), 0 0 30px rgba(56, 189, 248, 0.15);
+            animation: fadeIn 0.3s ease;
         }
 
-        @keyframes pulse-glow {
-            0%, 100% { border-color: var(--border); box-shadow: 0 0 0 transparent; }
-            50% { border-color: rgba(56, 189, 248, 0.4); box-shadow: 0 0 25px var(--primary-glow); }
+        .disambiguation-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
         }
 
-        .loading-text-line {
-            height: 14px;
-            background: linear-gradient(90deg, #1f293d 25%, #2d3b55 50%, #1f293d 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 4px;
+        .disambiguation-options {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
         }
 
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
+        .disambiguation-btn {
+            background: rgba(22, 33, 58, 0.75);
+            border: 1px solid var(--border-medium);
+            border-radius: var(--radius-sm);
+            padding: 0.85rem 1.25rem;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        /* Fixed Prompt Dock */
+        .disambiguation-btn:hover {
+            border-color: var(--primary);
+            background: rgba(56, 189, 248, 0.12);
+            transform: translateX(4px);
+            color: var(--primary-light);
+        }
+
+        /* Floating Modern Input Dock */
         .prompt-dock {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(180deg, rgba(9, 13, 22, 0) 0%, rgba(9, 13, 22, 0.95) 35%);
-            padding: 1.25rem 1.5rem 1.25rem;
+            background: linear-gradient(180deg, rgba(6, 9, 17, 0) 0%, rgba(6, 9, 17, 0.88) 30%, #060911 100%);
+            padding: 1.5rem 1.5rem 1.25rem;
             z-index: 90;
+            pointer-events: none;
         }
 
         .dock-inner {
-            max-width: 960px;
+            max-width: 980px;
             margin: 0 auto;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
         .search-box-form {
             display: flex;
             align-items: center;
-            background: rgba(17, 24, 39, 0.9);
-            border: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid var(--border-medium);
             border-radius: var(--radius-lg);
-            padding: 0.4rem 0.5rem 0.4rem 1.25rem;
-            backdrop-filter: blur(16px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-            transition: all 0.2s ease;
+            padding: 0.45rem 0.6rem 0.45rem 1.35rem;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 10px 40px -5px rgba(0, 0, 0, 0.75), 0 0 1px 1px rgba(255, 255, 255, 0.1);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .search-box-form:focus-within {
             border-color: var(--primary);
-            box-shadow: 0 0 25px var(--primary-glow);
+            box-shadow: 0 12px 45px -5px rgba(0, 0, 0, 0.85), 0 0 28px var(--primary-glow);
+            transform: translateY(-2px);
         }
 
         .search-input {
             flex: 1;
             background: transparent;
             border: none;
-            color: var(--text-main);
-            font-size: 1rem;
+            color: var(--text-primary);
+            font-size: 1.02rem;
             font-family: inherit;
             outline: none;
-            padding: 0.6rem 0;
+            padding: 0.7rem 0.5rem 0.7rem 0;
+            line-height: 1.4;
         }
 
         .search-input::placeholder {
-            color: var(--text-sub);
+            color: var(--text-subtle);
+        }
+
+        .clear-input-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-subtle);
+            cursor: pointer;
+            padding: 0.4rem;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: color 0.2s ease;
+        }
+
+        .clear-input-btn:hover {
+            color: var(--text-primary);
         }
 
         .submit-btn {
-            background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+            background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
             border: none;
-            border-radius: 9999px;
-            color: #090d16;
+            border-radius: var(--radius-full);
+            color: #060911;
             font-weight: 700;
-            font-size: 0.9rem;
-            padding: 0.65rem 1.35rem;
+            font-size: 0.92rem;
+            padding: 0.75rem 1.45rem;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 0.45rem;
-            transition: all 0.2s ease;
+            gap: 0.5rem;
+            transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 4px 18px rgba(56, 189, 248, 0.3);
+            flex-shrink: 0;
         }
 
-        .submit-btn:hover {
-            transform: scale(1.02);
-            box-shadow: 0 0 16px var(--primary-glow);
+        .submit-btn:hover:not(:disabled) {
+            transform: scale(1.03);
+            box-shadow: 0 6px 24px rgba(56, 189, 248, 0.45);
+        }
+
+        .submit-btn:active:not(:disabled) {
+            transform: scale(0.98);
         }
 
         .submit-btn:disabled {
-            opacity: 0.5;
+            opacity: 0.45;
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
 
-        /* Toast */
+        .dock-footer-hints {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 0.85rem;
+            font-size: 0.72rem;
+            color: var(--text-subtle);
+        }
+
+        /* Toast Notifications */
         .toast-box {
             position: fixed;
-            bottom: 5.5rem;
-            right: 1.5rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
+            bottom: 6rem;
+            right: 1.75rem;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--border-medium);
             border-radius: var(--radius-sm);
-            padding: 0.75rem 1.25rem;
+            padding: 0.85rem 1.35rem;
             font-size: 0.85rem;
-            color: var(--text-main);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            font-weight: 600;
+            color: var(--text-primary);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6), 0 0 1px 1px rgba(255, 255, 255, 0.1);
             display: none;
             z-index: 200;
+            backdrop-filter: blur(16px);
+            animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         /* Backend Connection Settings Modal */
         .modal-backdrop {
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(4, 7, 14, 0.75);
-            backdrop-filter: blur(8px);
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(4, 7, 14, 0.82);
+            backdrop-filter: blur(12px);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 1000;
-            padding: 1rem;
+            padding: 1.25rem;
+            animation: fadeIn 0.2s ease;
         }
 
         .modal-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-medium);
             border-radius: var(--radius-md);
-            padding: 1.75rem;
-            max-width: 500px;
+            padding: 2rem;
+            max-width: 520px;
             width: 100%;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(56, 189, 248, 0.1);
             display: flex;
             flex-direction: column;
-            gap: 1.25rem;
+            gap: 1.35rem;
         }
 
         .modal-header {
@@ -729,9 +1052,12 @@
         }
 
         .modal-header h3 {
-            font-size: 1.15rem;
+            font-size: 1.2rem;
             font-weight: 700;
-            color: var(--text-main);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
         }
 
         .modal-close-btn {
@@ -741,12 +1067,39 @@
             font-size: 1.4rem;
             cursor: pointer;
             line-height: 1;
-            padding: 0.2rem;
-            transition: color 0.2s ease;
+            padding: 0.3rem;
+            border-radius: var(--radius-xs);
+            transition: all 0.2s ease;
         }
 
         .modal-close-btn:hover {
-            color: var(--text-main);
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem 1.5rem 7.5rem;
+            font-size: 0.82rem;
+            color: var(--text-subtle);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            margin-top: auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        footer strong {
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            .hero h2 { font-size: 2.1rem; }
+            .hero p { font-size: 0.95rem; }
+            .dock-footer-hints { display: none; }
+            .nav-container { padding: 0.75rem 1rem; }
+            main { padding: 1.5rem 1rem 8rem; }
+            .citations-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -756,14 +1109,16 @@
     <header>
         <div class="nav-container">
             <a href="/" class="brand-container">
-                <div class="brand-logo">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
+                <div class="brand-logo-wrapper">
+                    <div class="brand-logo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                    </div>
                 </div>
                 <div class="brand-text">
                     <h1>AskPDF</h1>
@@ -771,17 +1126,20 @@
                 </div>
             </a>
             <div class="nav-actions">
-                <div class="status-badge" id="system-status" onclick="openBackendModal()" style="cursor:pointer;" title="Click to view or configure Backend API URL">
-                    <span class="status-dot"></span>
+                <div class="status-badge" id="system-status" onclick="openBackendModal()" title="Click to inspect or configure Backend API connection">
+                    <div class="status-dot-wrapper">
+                        <span class="status-ping"></span>
+                        <span class="status-dot"></span>
+                    </div>
                     <span id="status-text">Connecting...</span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:0.25rem;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="opacity:0.75; margin-left:0.15rem;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 </div>
                 <a href="/admin" class="admin-link-btn" title="Open Document Management Portal">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 20h9"></path>
                         <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                     </svg>
-                    Document Management
+                    <span>Document Management</span>
                 </a>
             </div>
         </div>
@@ -790,38 +1148,70 @@
     <!-- Main Content Area -->
     <main>
         <section class="hero">
-            <span class="hero-tag">Document Intelligence Platform</span>
-            <h2>Your documents. Your answers.</h2>
+            <span class="hero-tag">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                Document Intelligence Platform
+            </span>
+            <h2>Your documents. <span class="gradient-text">Your answers.</span></h2>
             <p>Upload PDF documents, ask natural-language questions, retrieve relevant information, and receive answers grounded in document evidence.</p>
 
             <div class="example-chips">
-                <button class="chip" onclick="applyPrompt('What is the abstract of 23MIS0125_ListLocal_Safalya.pdf?')">What is the abstract of ListLocal?</button>
-                <button class="chip" onclick="applyPrompt('Summarize the first document.')">Summarize the first document</button>
-                <button class="chip" onclick="applyPrompt('Compare the approaches in both documents.')">Compare both documents</button>
-                <button class="chip" onclick="applyPrompt('What are the main scope and limitations?')">What are the limitations?</button>
+                <button class="chip" onclick="applyPrompt('What is DocuMind AI according to the handbook?')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    What is DocuMind AI?
+                </button>
+                <button class="chip" onclick="applyPrompt('Summarize the first document.')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                    Summarize the first document
+                </button>
+                <button class="chip" onclick="applyPrompt('Compare the key architectural points across documents.')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                    Compare both documents
+                </button>
+                <button class="chip" onclick="applyPrompt('What are the main scope and limitations?')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    What are the limitations?
+                </button>
             </div>
         </section>
 
         <!-- Document Selector Bar -->
         <section class="doc-selector-bar" id="doc-selector-section">
             <div class="doc-selector-label">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                 <span>Target Scope:</span>
             </div>
             <div class="doc-pills" id="doc-pills-container">
-                <div class="doc-pill active" onclick="selectDocument('all')">All Documents</div>
+                <div class="doc-pill active" onclick="selectDocument('all')">All Documents (0)</div>
             </div>
         </section>
 
-        <!-- Loading Indicator -->
+        <!-- Multi-step Thinking / Loading Skeleton -->
         <div class="loading-card" id="loading-skeleton">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:0.85rem; color:var(--primary); font-weight:700;">Synthesizing grounded response with page citations...</span>
+            <div class="loading-header">
+                <div class="loading-step-indicator">
+                    <div class="spinner-ring"></div>
+                    <span id="loading-step-text">Synthesizing grounded response with page citations...</span>
+                </div>
             </div>
-            <div class="loading-text-line" style="width: 90%;"></div>
-            <div class="loading-text-line" style="width: 75%;"></div>
-            <div class="loading-text-line" style="width: 82%;"></div>
-            <div class="loading-text-line" style="width: 50%;"></div>
+            <div class="loading-text-line" style="width: 92%;"></div>
+            <div class="loading-text-line" style="width: 78%;"></div>
+            <div class="loading-text-line" style="width: 86%;"></div>
+            <div class="loading-text-line" style="width: 55%;"></div>
+            <div class="pipeline-steps">
+                <div class="pipeline-step active">
+                    <span class="pipeline-step-dot"></span>
+                    <span>1. ChromaDB Retrieval</span>
+                </div>
+                <div class="pipeline-step active">
+                    <span class="pipeline-step-dot"></span>
+                    <span>2. Anti-TOC & Page Alignment</span>
+                </div>
+                <div class="pipeline-step active">
+                    <span class="pipeline-step-dot"></span>
+                    <span>3. Llama 3.1 Grounded Synthesis</span>
+                </div>
+            </div>
         </div>
 
         <!-- Answers Feed -->
@@ -839,7 +1229,11 @@
                     placeholder="Ask a question, request an abstract, or summarize..."
                     autocomplete="off"
                     required
+                    oninput="handleInputTyping(this)"
                 />
+                <button type="button" class="clear-input-btn" id="clear-input-btn" onclick="clearSearchInput()" title="Clear query">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
                 <button type="submit" id="submit-btn" class="submit-btn">
                     <span>Ask PDF</span>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -848,6 +1242,10 @@
                     </svg>
                 </button>
             </form>
+            <div class="dock-footer-hints">
+                <span>✦ Press <strong>Enter ↵</strong> to submit</span>
+                <span>Grounded RAG with page citations • ChromaDB vector persistence</span>
+            </div>
         </div>
     </div>
 
@@ -908,10 +1306,25 @@
             loadDocumentPills();
         }
 
+        function handleInputTyping(el) {
+            const clearBtn = document.getElementById('clear-input-btn');
+            if (clearBtn) {
+                clearBtn.style.display = el.value.trim() ? 'flex' : 'none';
+            }
+        }
+
+        function clearSearchInput() {
+            const input = document.getElementById('query-input');
+            input.value = '';
+            handleInputTyping(input);
+            input.focus();
+        }
+
         // Check health on page load and periodic retry for cold starts
         async function checkHealth() {
             const statusText = document.getElementById('status-text');
             const dot = document.querySelector('.status-dot');
+            const ping = document.querySelector('.status-ping');
             const apiBase = getApiBaseUrl();
 
             if (apiBase === null) {
@@ -948,22 +1361,26 @@
                     if (statusText) statusText.textContent = `${providerLabel} Online (${model})`;
                     if (dot) {
                         dot.style.background = '#10b981';
-                        dot.style.boxShadow = '0 0 8px #10b981';
+                        dot.style.boxShadow = '0 0 10px #10b981';
                     }
+                    if (ping) ping.style.display = 'block';
                 } else {
                     if (statusText) statusText.textContent = `${providerLabel} Offline`;
                     if (dot) {
                         dot.style.background = '#ef4444';
-                        dot.style.boxShadow = '0 0 8px #ef4444';
+                        dot.style.boxShadow = '0 0 10px #ef4444';
                     }
+                    if (ping) ping.style.display = 'none';
                 }
             } catch (err) {
                 console.warn("Status check notice:", err);
                 if (statusText) statusText.textContent = "Backend Cold Start / Reconnecting...";
                 if (dot) {
                     dot.style.background = '#f59e0b';
-                    dot.style.boxShadow = '0 0 8px #f59e0b';
+                    dot.style.boxShadow = '0 0 10px #f59e0b';
                 }
+                if (ping) ping.style.display = 'none';
+
                 // Quick retry during cold start or initial reconnect
                 if (!window._healthRetryTimer) {
                     window._healthRetryTimer = setTimeout(() => {
@@ -994,17 +1411,42 @@
                 const container = document.getElementById('doc-pills-container');
                 const docs = data.documents || [];
 
-                let pillsHtml = `<div class="doc-pill ${selectedDocument === 'all' ? 'active' : ''}" onclick="selectDocument('all')">All Documents (${docs.length})</div>`;
+                let pillsHtml = `<div class="doc-pill ${selectedDocument === 'all' ? 'active' : ''}" onclick="selectDocument('all')">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    All Documents (${docs.length})
+                </div>`;
                 docs.forEach(doc => {
                     const isActive = selectedDocument === doc.filename || selectedDocument === doc.document_id;
-                    const cleanName = doc.display_name.length > 30 ? doc.display_name.substring(0, 27) + '...' : doc.display_name;
-                    pillsHtml += `<div class="doc-pill ${isActive ? 'active' : ''}" onclick="selectDocument('${escapeJs(doc.filename)}')">${doc.upload_order}. ${escapeHtml(cleanName)} (${doc.pages}p)</div>`;
+                    const cleanName = doc.display_name.length > 28 ? doc.display_name.substring(0, 25) + '...' : doc.display_name;
+                    pillsHtml += `<div class="doc-pill ${isActive ? 'active' : ''}" onclick="selectDocument('${escapeJs(doc.filename)}')">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        ${doc.upload_order}. ${escapeHtml(cleanName)} (${doc.pages}p)
+                    </div>`;
                 });
                 container.innerHTML = pillsHtml;
             } catch (e) {
                 console.warn("Error loading document pills:", e);
             }
         }
+        // Parse URL params for pre-selected document or initial prompt
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const docParam = urlParams.get('doc');
+            const qParam = urlParams.get('q');
+            if (docParam) {
+                selectedDocument = docParam;
+            }
+            if (qParam) {
+                const queryInput = document.getElementById('query-input');
+                if (queryInput) {
+                    queryInput.value = qParam;
+                    handleInputTyping(queryInput);
+                }
+            }
+        } catch (e) {
+            console.warn("Could not parse URL query parameters:", e);
+        }
+
         loadDocumentPills();
 
         function selectDocument(docRef) {
@@ -1016,7 +1458,9 @@
         function applyPrompt(text) {
             const input = document.getElementById('query-input');
             input.value = text;
+            handleInputTyping(input);
             input.focus();
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
         }
 
         function showToast(message, duration = 3000) {
@@ -1083,6 +1527,7 @@
 
                 renderAnswerCard(query, data.answer, data.sources || [], data.active_document);
                 input.value = '';
+                handleInputTyping(input);
                 checkHealth();
                 loadDocumentPills();
             } catch (err) {
@@ -1100,16 +1545,16 @@
             let optionsHtml = options.map(opt => `
                 <button class="disambiguation-btn" onclick="executeWithSelectedDoc('${escapeJs(query)}', '${escapeJs(opt.filename)}')">
                     <span>${escapeHtml(opt.display_name)}</span>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </button>
             `).join('');
 
             card.innerHTML = `
                 <div class="disambiguation-title">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                    <span>Document Scope Required: "${escapeHtml(query)}"</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span>Target Document Scope Required: "${escapeHtml(query)}"</span>
                 </div>
-                <p style="font-size:0.88rem; color:var(--text-muted);">${escapeHtml(message)}</p>
+                <p style="font-size:0.9rem; color:var(--text-secondary); line-height:1.5;">${escapeHtml(message)}</p>
                 <div class="disambiguation-options">${optionsHtml}</div>
             `;
 
@@ -1135,7 +1580,10 @@
                     return `
                         <div class="citation-card">
                             <div class="citation-top">
-                                <span class="citation-doc-name" title="${s.source}">${s.source}</span>
+                                <span class="citation-doc-name" title="${s.source}">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                    ${s.source}
+                                </span>
                                 <span class="citation-badge">${escapeHtml(label.split('—')[1] || `Page ${s.page}`)}</span>
                             </div>
                             <div class="citation-snippet">"${escapeHtml(s.snippet)}"</div>
@@ -1146,7 +1594,7 @@
                 citationsHtml = `
                     <div class="citations-section">
                         <div class="citations-title">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                             Verified Evidence & Page Citations (${sources.length})
                         </div>
                         <div class="citations-grid">${cardsHtml}</div>
@@ -1164,14 +1612,22 @@
 
             card.innerHTML = `
                 <div class="result-header">
-                    <div class="result-query-badge">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                        ${escapeHtml(query)}
+                    <div class="user-query-container">
+                        <div class="user-avatar">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        </div>
+                        <div class="user-query-text">${escapeHtml(query)}</div>
                     </div>
-                    <button class="copy-btn" onclick="navigator.clipboard.writeText(\`${escapeJs(answer)}\`); showToast('Answer copied to clipboard!');">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                        Copy Answer
-                    </button>
+                    <div class="result-actions">
+                        <button class="action-btn" onclick="navigator.clipboard.writeText(\`${escapeJs(answer)}\`); showToast('Answer copied to clipboard!');">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy Answer
+                        </button>
+                    </div>
+                </div>
+                <div class="ai-response-meta">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path></svg>
+                    <span>DocuMind Grounded Intelligence</span>
                 </div>
                 <div class="answer-body">${renderedAnswer}</div>
                 ${citationsHtml}
@@ -1185,13 +1641,16 @@
             const feed = document.getElementById('results-feed');
             const card = document.createElement('div');
             card.className = 'result-card';
-            card.style.borderColor = '#ef4444';
+            card.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+            card.style.boxShadow = '0 12px 40px -8px rgba(239, 68, 68, 0.2)';
 
             card.innerHTML = `
                 <div class="result-header">
-                    <div class="result-query-badge" style="color:#ef4444;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                        Query Failed: ${escapeHtml(query)}
+                    <div class="user-query-container">
+                        <div class="user-avatar" style="background:rgba(239, 68, 68, 0.15); border-color:rgba(239, 68, 68, 0.4); color:#f87171;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                        <div class="user-query-text" style="color:#f87171;">Query Notice: ${escapeHtml(query)}</div>
                     </div>
                 </div>
                 <div class="answer-body" style="color:#fca5a5;">${escapeHtml(errorMessage)}</div>
@@ -1212,27 +1671,30 @@
     <div id="backend-modal" class="modal-backdrop" style="display:none;">
         <div class="modal-card">
             <div class="modal-header">
-                <h3>Backend API Connection</h3>
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                    Backend API Connection
+                </h3>
                 <button type="button" class="modal-close-btn" onclick="closeBackendModal()">&times;</button>
             </div>
-            <p style="font-size:0.85rem; color:var(--text-muted); line-height:1.5;">
+            <p style="font-size:0.88rem; color:var(--text-muted); line-height:1.6;">
                 AskPDF runs frontend and backend unified on Render. You can also specify an override backend URL below for development or custom instances.
             </p>
-            <div style="display:flex; flex-direction:column; gap:0.45rem;">
-                <label style="font-size:0.75rem; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.04em;">Backend API URL</label>
-                <input type="url" id="backend-url-input" class="search-input" style="background:var(--surface); border:1px solid var(--border); padding:0.65rem 0.85rem; border-radius:var(--radius-sm); font-size:0.9rem;" placeholder="https://documind-ai-ddt8.onrender.com or http://localhost:8000">
+            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Backend API URL</label>
+                <input type="url" id="backend-url-input" class="search-input" style="background:var(--bg-surface); border:1px solid var(--border-medium); padding:0.75rem 1rem; border-radius:var(--radius-sm); font-size:0.92rem; color:var(--text-primary);" placeholder="https://documind-ai-ddt8.onrender.com or http://localhost:8000">
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.75rem;">
                 <button type="button" class="admin-link-btn" onclick="resetBackendUrl()" style="font-size:0.8rem;">Reset Default</button>
-                <div style="display:flex; gap:0.5rem;">
+                <div style="display:flex; gap:0.6rem;">
                     <button type="button" class="admin-link-btn" onclick="closeBackendModal()">Cancel</button>
-                    <button type="button" class="submit-btn" style="padding:0.55rem 1.15rem; font-size:0.85rem;" onclick="saveBackendUrl()">Save & Connect</button>
+                    <button type="button" class="submit-btn" style="padding:0.6rem 1.25rem; font-size:0.86rem;" onclick="saveBackendUrl()">Save & Connect</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer style="text-align: center; padding: 2rem 1.5rem 6.5rem; font-size: 0.8rem; color: var(--text-sub); border-top: 1px solid rgba(31, 41, 61, 0.4); margin-top: auto;">
+    <footer>
         AskPDF &copy; 2026 &mdash; <strong>Your documents. Your answers.</strong> Grounded in document evidence.
     </footer>
 </body>
