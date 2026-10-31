@@ -25,6 +25,7 @@ except ImportError:
 
 from core.config import load_config
 from core.doc_registry import registry
+from core.vector_store import trim_process_memory
 from qa_engine import (
     initialize_qa_engine,
     check_ollama_status,
@@ -126,12 +127,12 @@ async def _reinitialize_qa_engine_unlocked():
     try:
         pipeline, _ = await asyncio.to_thread(initialize_qa_engine, "config.yaml")
         rag_pipeline = pipeline
-        gc.collect()
+        trim_process_memory()
         logger.info("AskPDF QA Engine initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to reinitialize QA engine: {e}", exc_info=True)
         rag_pipeline = None
-        gc.collect()
+        trim_process_memory()
 
 
 async def reinitialize_qa_engine():
@@ -145,8 +146,14 @@ async def lifespan(app: FastAPI):
     os.makedirs(PDF_DIR, exist_ok=True)
     os.makedirs(PERSIST_DIR, exist_ok=True)
     registry.reconcile_with_disk(PDF_DIR)
+    
+    # Give the container 2 seconds to settle its initial boot memory before starting QA engine indexing
+    async def delayed_engine_init():
+        await asyncio.sleep(2.0)
+        await reinitialize_qa_engine()
+
     # Asynchronously initialize QA engine in background so Uvicorn binds immediately and health checks pass
-    asyncio.create_task(reinitialize_qa_engine())
+    asyncio.create_task(delayed_engine_init())
     yield
 
 

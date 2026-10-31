@@ -19,6 +19,7 @@ export OPENBLAS_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export TORCH_NUM_THREADS=1
+export MALLOC_TRIM_THRESHOLD_=65536
 
 echo "Starting AskPDF Document Intelligence Service on port ${PORT}..."
 echo "PDF Directory: ${PDF_DIR}"

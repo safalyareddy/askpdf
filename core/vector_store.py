@@ -12,21 +12,34 @@ logger = logging.getLogger("documind.vectorstore")
 CHROMA_COLLECTION_NAME = "documind_documents"
 
 
+def trim_process_memory():
+    """Forces garbage collection and glibc malloc heap trimming to stay strictly under Render 512MB RAM ceiling."""
+    gc.collect()
+    try:
+        import ctypes
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        pass
+
+
 @functools.lru_cache(maxsize=4)
 def get_embedding_function(model_name: str = "BAAI/bge-small-en-v1.5") -> HuggingFaceEmbeddings:
     """Initializes and caches the HuggingFace embedding model with memory-safe batch size."""
     try:
         import torch
+        torch.set_grad_enabled(False)
         torch.set_num_threads(1)
         torch.set_num_interop_threads(1)
     except Exception:
         pass
     logger.info(f"Loading embedding model: {model_name}")
-    return HuggingFaceEmbeddings(
+    model = HuggingFaceEmbeddings(
         model_name=model_name,
         model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True, "batch_size": 8}
+        encode_kwargs={"normalize_embeddings": True, "batch_size": 4}
     )
+    trim_process_memory()
+    return model
 
 
 def build_or_load_vectorstore(
@@ -93,17 +106,18 @@ def build_or_load_vectorstore(
                 f"Indexing {len(chunks_to_add)} document chunks into persistent Chroma collection "
                 f"'{CHROMA_COLLECTION_NAME}' at '{persist_dir}'..."
             )
-            batch_size = 8
+            batch_size = 4
             for i in range(0, len(chunks_to_add), batch_size):
                 batch = chunks_to_add[i:i + batch_size]
                 vectorstore.add_documents(batch)
-                gc.collect()
+                trim_process_memory()
         else:
             logger.info(
                 f"All {len(incoming_sources)} document(s) are already persistently indexed in "
                 f"Chroma collection '{CHROMA_COLLECTION_NAME}'."
             )
 
+        trim_process_memory()
         return vectorstore
 
     # If no incoming documents were passed, check if collection already contains data
