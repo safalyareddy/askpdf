@@ -4,44 +4,44 @@
 > **Tagline:** *Your documents. Your answers.*  
 > **Repository:** [https://github.com/safalyareddy/askpdf](https://github.com/safalyareddy/askpdf)
 
-This guide documents the production cloud deployment architecture on **Vercel** and **Railway**, persistent storage configuration, hosted cloud LLM inference setup (independent of your local machine), and local Apple Silicon development workflows.
+This guide documents the unified production cloud deployment architecture on **Render**, persistent document bundling, hosted cloud LLM inference setup (independent of your local machine), and local Apple Silicon development workflows.
 
 ---
 
 ## 1. Production Cloud Architecture
 
-AskPDF uses a decoupled, high-availability cloud architecture designed to remain operational 24/7 without requiring any local workstation to stay online:
+AskPDF uses a unified zero-cost cloud architecture on Render where FastAPI directly serves both the static web frontend (SPA) and the REST API from the same origin:
 
 ```
                             ┌───────────────────────────────────────┐
                             │           PUBLIC CLIENT               │
                             │      Desktop & Mobile Browsers        │
                             └───────────────────┬───────────────────┘
-                                                │
-                       ┌────────────────────────┴────────────────────────┐
-                       │                                                 │
-                       ▼ HTTPS                                           ▼ HTTPS
-       ┌───────────────────────────────┐                 ┌───────────────────────────────┐
-       │        VERCEL FRONTEND        │                 │        RAILWAY BACKEND        │
-       │    https://askpdf.vercel.app  │                 │ https://askpdf.up.railway.app │
-       │                               │                 │                               │
-       │  • index.html (Q&A Interface) │◄────────────────┤  • FastAPI 0.115+ (Uvicorn)   │
-       │  • admin.html (Document Mgt)  │  CORS-Enabled   │  • /health, /documents, /ask  │
-       │  • vercel.json (Clean Routes) │   JSON REST     │  • /admin/* (Header Auth)     │
-       │  • Dynamic Backend URL Config │                 │  • BAAI/bge-small-en-v1.5     │
-       └───────────────────────────────┘                 └───────────────┬───────────────┘
-                                                                         │
-                                         ┌───────────────────────────────┴───────────────────────────────┐
-                                         │                                                               │
-                                         ▼ Persistent Storage                                            ▼ Cloud Inference API
-                         ┌───────────────────────────────┐                               ┌───────────────────────────────┐
-                         │   RAILWAY PERSISTENT VOLUME   │                               │       HOSTED LLM SERVICE      │
-                         │      Mount: /app/data, /app/db│                               │      Groq Cloud or OpenAI     │
-                         │                               │                               │                               │
-                         │  • /app/data/*.pdf            │                               │  • llama-3.1-8b-instant       │
-                         │  • /app/db/chroma.sqlite3     │                               │  • Ultra-low latency (<1.5s)  │
-                         │  • documents_registry.json    │                               │  • Zero Mac dependency        │
-                         └───────────────────────────────┘                               └───────────────────────────────┘
+                                                │ HTTPS
+                                                ▼
+        ┌───────────────────────────────────────────────────────────────┐
+        │                 RENDER UNIFIED WEB SERVICE                    │
+        │             https://documind-ai-ddt8.onrender.com             │
+        ├───────────────────────────────┬───────────────────────────────┤
+        │        FRONTEND SPA           │        FASTAPI BACKEND        │
+        │                               │                               │
+        │  • index.html (Q&A Interface) │  • FastAPI 0.115+ (Uvicorn)   │
+        │  • admin.html (Document Mgt)  │  • /health, /documents, /ask  │
+        │  • config.js (Same-Origin)    │  • /admin/* (Header Auth)     │
+        │  • Static Assets & Styles     │  • BAAI/bge-small-en-v1.5     │
+        └───────────────────────────────┴───────────────┬───────────────┘
+                                                        │
+                                        ┌───────────────┴───────────────┐
+                                        │                               │
+                                        ▼ Local Vector Engine           ▼ Cloud Inference API
+                        ┌───────────────────────────────┐ ┌───────────────────────────────┐
+                        │     CHROMADB PERSISTENT DB    │ │       HOSTED LLM SERVICE      │
+                        │      Mount: ./data, ./db      │ │      Groq Cloud or OpenAI     │
+                        │                               │ │                               │
+                        │  • ./data/*.pdf               │ │  • llama-3.1-8b-instant       │
+                        │  • ./db/chroma.sqlite3        │ │  • Ultra-low latency (<1.5s)  │
+                        │  • documents_registry.json    │ │  • Zero Mac dependency        │
+                        └───────────────────────────────┘ └───────────────────────────────┘
 ```
 
 ---
@@ -133,29 +133,27 @@ To guarantee that AskPDF works continuously even when your laptop is turned off:
 
 ---
 
-## 4. Deploying the Frontend on Vercel
+## 4. Zero-Cost Unified Deployment on Render
 
 ### Repository
 - GitHub: `https://github.com/safalyareddy/askpdf`
 
 ### Deployment Steps
-1. Log in to [Vercel](https://vercel.com).
-2. Click **Add New...** → **Project** → Import `safalyareddy/askpdf`.
-3. In Project Settings:
-   - **Framework Preset:** `Other`
-   - **Root Directory:** `./`
-   - **Build Command:** *(Leave empty)*
-   - **Output Directory:** `./`
-4. Click **Deploy**.
-5. Vercel deploys the application using `vercel.json`:
+1. Log in to [Render](https://dashboard.render.com).
+2. Click **New** → **Web Service** → Connect `safalyareddy/askpdf`.
+3. Select Docker runtime (or use the repository Blueprint `render.yaml`).
+4. Set required Environment Variables:
+   - `LLM_PROVIDER`: `groq`
+   - `LLM_BASE_URL`: `https://api.groq.com/openai/v1`
+   - `LLM_MODEL`: `llama-3.1-8b-instant`
+   - `LLM_API_KEY`: *(Your Groq API key)*
+   - `SUPER_USER_KEY`: *(Your secure admin key)*
+5. Click **Create Web Service**.
+6. Render serves the unified application:
    - `/` serves `index.html` (AskPDF Question Answering Portal)
-   - `/admin` cleanly routes to `admin.html` (Document Management Portal) without 404s
-   - Security headers (`X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`) are applied automatically.
-
-### Connecting Frontend to Railway Backend
-AskPDF features dynamic zero-recompile backend routing:
-- **Option A (UI Modal):** On your deployed Vercel site, click the system status badge in the header (`Connecting...` or `Offline` with the gear icon). Enter your Railway backend domain (e.g., `https://askpdf-production.up.railway.app`), and click **Save & Connect**. The setting persists in `localStorage` across all browser sessions.
-- **Option B (Window Global):** Inject `window.ASKPDF_API_URL = "https://your-railway-app.up.railway.app";` if using custom domain scripts.
+   - `/admin` and `/admin.html` serve the Document Management Portal
+   - `/config.js` configures the frontend automatically to use same-origin requests (`window.location.origin`)
+   - `/health`, `/documents`, `/ask` handle backend RAG operations with zero CORS configuration.
 
 ---
 
@@ -211,7 +209,6 @@ Local endpoints:
 
 | Service | Tier | Estimated Cost | Notes |
 | :--- | :--- | :--- | :--- |
-| **Vercel** | Hobby / Free | **$0.00 / month** | 100 GB bandwidth, unlimited deployments. |
-| **Railway** | Starter / Trial | **$0.00 to ~$5.00 / month** | $5 free monthly credit. Container uses ~250MB RAM with PyTorch CPU. |
-| **Groq Cloud** | Free Tier | **$0.00 / month** | 30 requests/min, 14,400 requests/day free. |
-| **Total Cloud Operating Cost** | | **$0.00 / month** (within free tier) | |
+| **Render** | Free Web Service | **$0.00 / month** | Unified SPA frontend + FastAPI backend. 512MB RAM free. |
+| **Groq Cloud** | Free Tier | **$0.00 / month** | 30 requests/min, 14,400 requests/day free (Llama 3.1 8B). |
+| **Total Cloud Operating Cost** | | **$0.00 / month** (Guaranteed ₹0/month) | |

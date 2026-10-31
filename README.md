@@ -3,29 +3,28 @@
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store%20v2.0-FF6F00?style=flat)](https://trychroma.com)
-[![Vercel](https://img.shields.io/badge/Vercel-Frontend%20Hosting-000000?style=flat&logo=vercel&logoColor=white)](https://vercel.com)
-[![Railway](https://img.shields.io/badge/Railway-Backend%20Cloud-0B0D0E?style=flat&logo=railway&logoColor=white)](https://railway.app)
+[![Render](https://img.shields.io/badge/Render-Unified%20Hosting-46E3B7?style=flat&logo=render&logoColor=white)](https://render.com)
 [![Groq](https://img.shields.io/badge/Groq-Llama%203.1%20Inference-F05A28?style=flat)](https://groq.com)
 [![Ollama](https://img.shields.io/badge/Ollama-Llama--3%20(Local)-white?style=flat&logo=ollama&logoColor=black)](https://ollama.com)
-[![Tests](https://img.shields.io/badge/Tests-32%20Passed%20(100%25)-brightgreen?style=flat)](TEST_RESULTS.md)
+[![Tests](https://img.shields.io/badge/Tests-34%20Passed%20(100%25)-brightgreen?style=flat)](TEST_RESULTS.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 An enterprise-grade document intelligence platform that allows users to upload PDF documents, ask natural-language questions, retrieve relevant passages, and receive answers strictly grounded in document evidence.
 
-**AskPDF** is designed for high reliability across both **Production Cloud Deployment** (Vercel Frontend + Railway FastAPI Backend with Persistent Storage + Hosted Llama 3.1 Inference) and **Local Offline Deployment** (Apple Silicon macOS + Ollama + Local ChromaDB).
+**AskPDF** is unified into a single zero-cost deployment on **Render** (serving both the interactive single-page web app and the FastAPI RAG backend with Groq Llama 3.1 inference) as well as **Local Offline Deployment** (macOS + Ollama + Local ChromaDB).
 
 ---
 
 ## 📑 Core Documentation Index
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: Cloud and local system architecture, data flow, and 9-layer component specification.
-- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)**: Step-by-step production cloud setup for Vercel, Railway, and Groq Cloud.
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)**: Production cloud setup for Render and Groq Cloud.
 - **[RAG_PIPELINE.md](RAG_PIPELINE.md)**: Page-aware PDF ingestion, dense vector indexing, and hybrid reranking pipeline.
 - **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)**: Complete REST API specification for public and administrative endpoints.
 - **[EVALUATION_REPORT.md](EVALUATION_REPORT.md)**: Verified ground-truth benchmark metrics (Recall@5: 100%, MRR: 0.905, Attribution: 100%).
 - **[SECURITY_AUDIT.md](SECURITY_AUDIT.md)**: Threat models, constant-time authentication, rate limiting, and defensive response parsing.
-- **[TEST_RESULTS.md](TEST_RESULTS.md)**: 32-test automated pytest execution logs and coverage breakdown.
-- **[BACKUP_AND_RECOVERY.md](BACKUP_AND_RECOVERY.md)**: Disaster recovery runbooks and persistent volume snapshot procedures.
+- **[TEST_RESULTS.md](TEST_RESULTS.md)**: 34-test automated pytest execution logs and coverage breakdown.
+- **[BACKUP_AND_RECOVERY.md](BACKUP_AND_RECOVERY.md)**: Disaster recovery runbooks and data snapshot procedures.
 - **[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)**: Technical boundaries, context limits, and token constraints.
 - **[CHANGELOG.md](CHANGELOG.md)**: Complete upgrade history and release notes.
 
@@ -33,12 +32,10 @@ An enterprise-grade document intelligence platform that allows users to upload P
 
 ## ✨ Key Capabilities
 
-- **24/7 Cloud Architecture (Laptop Independent)**:
-  - Deploys on **Vercel** (static frontend with dynamic API routing) and **Railway** (FastAPI backend in Docker container).
-  - Uses hosted OpenAI-compatible inference (**Groq Cloud** or **OpenAI**) so the application works even when your computer is switched off.
-- **Persistent Cloud Storage**:
-  - Railway persistent volume mounted at `/app/data` (PDFs) and `/app/db` (ChromaDB vector store + registry).
-  - Survives container restarts, code updates, and redeployments.
+- **Zero-Cost Unified Cloud Architecture (₹0/month)**:
+  - Deploys frontend Single Page Application and FastAPI backend together on **Render**.
+  - Direct same-origin requests eliminate CORS latency, Vercel build drifts, and environment configuration headaches.
+  - Hosted OpenAI-compatible inference (**Groq Cloud Llama 3.1**) provides instant Q&A without requiring local GPU/compute.
 - **Accurate Dual-Page Citations**:
   - *Physical PDF Page Number*: The 1-indexed page position in standard PDF readers.
   - *Printed Page Number*: The page number printed on headers or footers.
@@ -58,7 +55,7 @@ An enterprise-grade document intelligence platform that allows users to upload P
 
 ---
 
-## 🏗️ Dual-Mode Architecture
+## 🏗️ System Architecture
 
 ```
                                   PUBLIC USERS (Browser)
@@ -67,16 +64,13 @@ An enterprise-grade document intelligence platform that allows users to upload P
                        │                                           │
                        ▼                                           ▼
        ┌───────────────────────────────┐           ┌───────────────────────────────┐
-       │   CLOUD PRODUCTION (Vercel)   │           │    LOCAL WORKSTATION (Mac)    │
-       │    https://askpdf.vercel.app  │           │     http://localhost:8000     │
-       └───────────────┬───────────────┘           └───────────────┬───────────────┘
-                       │ HTTPS / CORS                              │ HTTP
-                       ▼                                           ▼
-       ┌───────────────────────────────┐           ┌───────────────────────────────┐
-       │   RAILWAY FASTAPI CONTAINER   │           │    LOCAL FASTAPI INSTANCE     │
-       │    FastAPI + Uvicorn ($PORT)  │           │   FastAPI + Uvicorn (Port 8000│
+       │     RENDER (Unified Cloud)    │           │    LOCAL WORKSTATION (Mac)    │
+       │ https://documind-ai-ddt8.     │           │     http://localhost:8000     │
+       │ onrender.com                  │           │                               │
        ├───────────────────────────────┤           ├───────────────────────────────┤
-       │ • Persistent Volume (/app/db) │           │ • Local Storage (./data, ./db)│
+       │ • Static SPA (index, admin)   │           │ • Static SPA (index, admin)   │
+       │ • FastAPI REST Engine         │           │ • FastAPI REST Engine         │
+       │ • ChromaDB Vector Index       │           │ • ChromaDB Vector Index       │
        │ • BGE-Small CPU Embeddings    │           │ • BGE-Small CPU Embeddings    │
        │ • Groq Cloud (Llama 3.1 8B)   │           │ • Ollama Local (Llama 3 8B)   │
        └───────────────────────────────┘           └───────────────────────────────┘
@@ -84,14 +78,18 @@ An enterprise-grade document intelligence platform that allows users to upload P
 
 ---
 
-## 🚀 Cloud Deployment
+## 🚀 Live Production Deployment
 
-### 1. Deploy Backend on Railway
+The unified application is live and publicly accessible:
+- **Web App**: [https://documind-ai-ddt8.onrender.com](https://documind-ai-ddt8.onrender.com)
+- **Document Management Portal**: [https://documind-ai-ddt8.onrender.com/admin](https://documind-ai-ddt8.onrender.com/admin)
+- **Health Check**: [https://documind-ai-ddt8.onrender.com/health](https://documind-ai-ddt8.onrender.com/health)
+- **Interactive API Docs**: [https://documind-ai-ddt8.onrender.com/docs](https://documind-ai-ddt8.onrender.com/docs)
+
+### Deployment Setup (Render)
 1. Push to GitHub repo `https://github.com/safalyareddy/askpdf`.
-2. Connect the repository in [Railway](https://railway.app).
-3. Railway automatically builds via `Dockerfile` and `railway.json`.
-4. Attach a **Persistent Volume** mounted at `/app/data` and `/app/db`.
-5. Set environment variables:
+2. Connect repo to [Render](https://render.com) using the root `render.yaml` or create a Web Service using the repo's `Dockerfile`.
+3. Set environment variables in Render Dashboard:
    ```env
    PORT=8000
    LLM_PROVIDER=groq
@@ -100,13 +98,7 @@ An enterprise-grade document intelligence platform that allows users to upload P
    LLM_API_KEY=gsk_your_groq_api_key_here
    SUPER_USER_KEY=your_secure_admin_key_here
    ```
-6. Generate a public domain (e.g., `https://askpdf-production.up.railway.app`).
-
-### 2. Deploy Frontend on Vercel
-1. In [Vercel](https://vercel.com), import `safalyareddy/askpdf`.
-2. Use Framework Preset `Other` with root directory `./`.
-3. Click **Deploy**. Vercel serves the application according to `vercel.json`.
-4. In the deployed frontend, click the system status badge to save your Railway backend domain in the settings modal.
+4. Render builds the Docker image and serves both the frontend SPA and FastAPI backend under your public `.onrender.com` domain.
 
 ---
 
