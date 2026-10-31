@@ -924,7 +924,7 @@
                 const res = await fetch(`${apiBase}/health`);
                 if (res.ok) {
                     const data = await res.json();
-                    const providerLabel = data.provider === 'ollama' ? 'Ollama' : (data.provider || '').toUpperCase();
+                    const providerLabel = data.provider === 'ollama' ? 'Ollama' : (data.provider === 'openai_compatible' ? 'AI Cloud' : (data.provider || '').toUpperCase());
                     if (data.model_online) {
                         statusText.textContent = `${providerLabel} Online (${data.model || 'Active'})`;
                         dot.style.background = '#10b981';
