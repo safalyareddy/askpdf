@@ -213,3 +213,38 @@ def test_predict_alias():
         assert res.status_code == 200
         assert res.json()["answer"] == "Prediction result."
 
+
+def test_sanitize_filename_prevents_path_traversal():
+    from main import sanitize_filename
+    assert sanitize_filename("../../../etc/passwd.pdf") == "passwd.pdf"
+    assert sanitize_filename("..\\..\\windows\\system32\\calc.pdf") == "calc.pdf" or "windows" in sanitize_filename("..\\..\\windows\\system32\\calc.pdf")
+    assert sanitize_filename("my report (1).pdf") == "my_report__1_.pdf"
+    assert sanitize_filename("test") == "test.pdf"
+
+
+def test_upload_oversized_pdf_rejected():
+    # 21 MB payload exceeding the 20 MB limit
+    oversized_bytes = b"%PDF-" + b"0" * (21 * 1024 * 1024)
+    files = {"file": ("huge_document.pdf", oversized_bytes, "application/pdf")}
+    res = client.post(
+        "/admin/upload-pdf",
+        files=files,
+        headers={"X-Admin-Key": SUPER_USER_KEY}
+    )
+    assert res.status_code == 413
+    assert "exceeds maximum allowed upload size" in res.json()["detail"]
+
+
+def test_openapi_and_docs_endpoints():
+    res_docs = client.get("/docs")
+    assert res_docs.status_code == 200
+    assert "Swagger UI" in res_docs.text or "swagger-ui" in res_docs.text
+
+    res_open = client.get("/openapi.json")
+    assert res_open.status_code == 200
+    data = res_open.json()
+    assert "openapi" in data
+    assert "/ask" in data["paths"]
+    assert "/admin/upload-pdf" in data["paths"]
+
+

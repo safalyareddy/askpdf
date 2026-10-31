@@ -126,10 +126,12 @@ async def _reinitialize_qa_engine_unlocked():
     try:
         pipeline, _ = await asyncio.to_thread(initialize_qa_engine, "config.yaml")
         rag_pipeline = pipeline
+        gc.collect()
         logger.info("AskPDF QA Engine initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to reinitialize QA engine: {e}", exc_info=True)
         rag_pipeline = None
+        gc.collect()
 
 
 async def reinitialize_qa_engine():
@@ -143,7 +145,8 @@ async def lifespan(app: FastAPI):
     os.makedirs(PDF_DIR, exist_ok=True)
     os.makedirs(PERSIST_DIR, exist_ok=True)
     registry.reconcile_with_disk(PDF_DIR)
-    await reinitialize_qa_engine()
+    # Asynchronously initialize QA engine in background so Uvicorn binds immediately and health checks pass
+    asyncio.create_task(reinitialize_qa_engine())
     yield
 
 

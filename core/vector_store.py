@@ -15,11 +15,17 @@ CHROMA_COLLECTION_NAME = "documind_documents"
 @functools.lru_cache(maxsize=4)
 def get_embedding_function(model_name: str = "BAAI/bge-small-en-v1.5") -> HuggingFaceEmbeddings:
     """Initializes and caches the HuggingFace embedding model with memory-safe batch size."""
+    try:
+        import torch
+        torch.set_num_threads(1)
+        torch.set_num_interop_threads(1)
+    except Exception:
+        pass
     logger.info(f"Loading embedding model: {model_name}")
     return HuggingFaceEmbeddings(
         model_name=model_name,
         model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True, "batch_size": 16}
+        encode_kwargs={"normalize_embeddings": True, "batch_size": 8}
     )
 
 
@@ -87,7 +93,7 @@ def build_or_load_vectorstore(
                 f"Indexing {len(chunks_to_add)} document chunks into persistent Chroma collection "
                 f"'{CHROMA_COLLECTION_NAME}' at '{persist_dir}'..."
             )
-            batch_size = 32
+            batch_size = 8
             for i in range(0, len(chunks_to_add), batch_size):
                 batch = chunks_to_add[i:i + batch_size]
                 vectorstore.add_documents(batch)
